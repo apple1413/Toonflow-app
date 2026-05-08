@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 新增原文数据
@@ -21,6 +22,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, data } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
     const totalNovelId = [];
     const getLastChapterIndex = await u.db("o_novel").where("projectId", projectId).select("chapterIndex").orderBy("chapterIndex", "desc").first();
     let lastChapterIndex = 0;

@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsNovels } from "@/utils/ownership";
 
 const router = express.Router();
 
@@ -16,6 +17,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, novelIds, concurrentCount = 5 } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsNovels(userId, novelIds);
 
     const [allChapters, novel] = await Promise.all([
       u.db("o_novel").where("projectId", projectId).whereIn("id", novelIds),

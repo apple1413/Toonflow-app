@@ -4,6 +4,7 @@ import { db } from "@/utils/db";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -16,6 +17,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, page, limit, search } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
     const offset = (page - 1) * limit;
 
     // 构造基础查询：通过 o_eventChapter -> o_novel 过滤 projectId，再 join o_event 取名称和内容

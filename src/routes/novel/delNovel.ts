@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsNovel } from "@/utils/ownership";
 const router = express.Router();
 
 // 删除原文
@@ -13,6 +14,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
+    await assertOwnsNovel(userIdOf(req), id);
 
     const chapterData = await u.db("o_eventChapter").where("novelId", id);
     await u.db("o_eventChapter").where("novelId", id).delete();

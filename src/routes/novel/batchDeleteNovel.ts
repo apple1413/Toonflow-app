@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsNovels } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -15,6 +16,7 @@ export default router.post(
     if (!ids.length) {
       return res.status(400).send(error("请先选择需要删除的内容"));
     }
+    await assertOwnsNovels(userIdOf(req), ids);
     const chapterData = await u.db("o_eventChapter").whereIn("novelId", ids);
     await u.db("o_eventChapter").whereIn("novelId", ids).delete();
     const eventIds = chapterData.map((i) => i.id);

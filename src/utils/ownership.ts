@@ -110,3 +110,27 @@ export async function listOwnedProjectIds(userId: number): Promise<number[]> {
   const rows = await db("o_project").where({ userId }).select("id");
   return rows.map((r: any) => Number(r.id));
 }
+
+/** 事件归属：o_event → o_eventChapter → o_novel → o_project
+ *  没有 chapter 关联的孤立事件视为无主，拒绝跨用户操作
+ */
+export async function assertOwnsEvents(userId: number, eventIds: unknown[]): Promise<void> {
+  if (!Array.isArray(eventIds) || eventIds.length === 0) return;
+  const cids = [...new Set(eventIds.filter((v) => v != null).map(toId))];
+  const rows = await db("o_eventChapter as ec")
+    .leftJoin("o_novel as n", "n.id", "ec.novelId")
+    .whereIn("ec.eventId", cids)
+    .select("ec.eventId as eventId", "n.projectId as projectId");
+  // 每个 event 必须至少有一条 chapter 关联，且所有关联的 novel 都归当前 user
+  const seen = new Set<number>();
+  const projectIds: number[] = [];
+  for (const r of rows) {
+    if (r.projectId == null) throw new ForbiddenError("事件归属不明");
+    seen.add(Number(r.eventId));
+    projectIds.push(Number(r.projectId));
+  }
+  for (const eid of cids) if (!seen.has(eid)) throw new ForbiddenError("事件不存在或无关联章节");
+  await assertOwnsProjects(userId, projectIds);
+}
+
+export const assertOwnsEvent = (uid: number, id: unknown) => assertOwnsEvents(uid, [id]);
