@@ -4,6 +4,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsVideoTrack } from "@/utils/ownership";
 const router = express.Router();
 
 type Type = "imageReference" | "startImage" | "endImage" | "videoReference" | "audioReference";
@@ -38,6 +39,10 @@ export default router.post(
   }),
   async (req, res) => {
     const { scriptId, projectId, prompt, uploadData, model, duration, resolution, audio, mode, trackId } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
+    await assertOwnsVideoTrack(userId, trackId);
     let modeData = [];
     if (Array.isArray(mode)) {
     } else if (typeof mode === "string" && mode.startsWith('["') && mode.endsWith('"]')) {

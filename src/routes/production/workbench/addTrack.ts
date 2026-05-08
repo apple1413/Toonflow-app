@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 export default router.post(
   "/",
@@ -13,6 +14,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, scriptId, duration } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
     const data = await u.db("o_project").where("id", projectId).first();
     const video = data?.videoModel?.split(":");
     const vemdor = await u.vendor.getModelList(video?.[0]!);

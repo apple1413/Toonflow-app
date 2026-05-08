@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { info } from "node:console";
+import { userIdOf, assertOwnsProject, assertOwnsVideoTrack } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -21,6 +22,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { trackId, projectId, info, model } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsVideoTrack(userId, trackId);
     //查询参数
     const images = await Promise.all(
       info.map(async (item: { id: number; sources: string }) => {
