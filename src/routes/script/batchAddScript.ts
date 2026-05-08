@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 新增剧本
@@ -19,6 +20,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { data, projectId } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
     await u.db("o_script").insert(
       data.map((i: { scriptName: string; scriptData: string }) => {
         return {

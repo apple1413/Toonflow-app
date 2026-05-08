@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsScript, assertOwnsAssets } from "@/utils/ownership";
 const router = express.Router();
 
 // 编辑剧本
@@ -16,6 +17,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { id, name, content, assets } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsScript(userId, id);
+    if (assets.length) await assertOwnsAssets(userId, assets);
     await u.db("o_script").where({ id }).update({
       name,
       content,

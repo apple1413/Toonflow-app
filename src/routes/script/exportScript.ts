@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import compressing from "compressing";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsScripts } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -13,6 +14,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
+    await assertOwnsScripts(userIdOf(req), id);
     const scripts = await u.db("o_script").whereIn("id", id);
     const textList = scripts.map((s) => ({ name: s.name, text: s.content }));
     //压缩为zip文件

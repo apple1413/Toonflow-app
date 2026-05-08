@@ -6,6 +6,7 @@ import { validateFields } from "@/middleware/middleware";
 import { useSkill } from "@/utils/agent/skillsTools";
 import { tool } from "ai";
 import { o_script } from "@/types/database";
+import { userIdOf, assertOwnsProject, assertOwnsScripts } from "@/utils/ownership";
 
 const router = express.Router();
 
@@ -64,6 +65,9 @@ export default router.post(
     const { scriptIds, projectId, groupSize = 5 } = req.body;
 
     if (!scriptIds.length) return res.status(400).send(error("请先选择剧本"));
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScripts(userId, scriptIds);
     const scripts = await u.db("o_script").whereIn("id", scriptIds);
 
     // 构建 scriptId -> script 内容的映射
