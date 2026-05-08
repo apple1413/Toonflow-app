@@ -3,6 +3,7 @@ import { success } from "@/lib/responseFormat";
 import u from "@/utils";
 import { z } from "zod";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -13,11 +14,14 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, agentType } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
     const row = await u.db("o_agentWorkData").where({ projectId: projectId, key: agentType }).first();
 
     if (!row) {
       const [id] = await u.db("o_agentWorkData").insert({
         projectId: projectId,
+        userId,
         key: agentType,
         data: JSON.stringify({
           storySkeleton: "",

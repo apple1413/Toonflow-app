@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { tool } from "ai";
+import { userIdOf, assertOwnsProject, assertOwnsAssets } from "@/utils/ownership";
 const router = express.Router();
 
 // 获取资产
@@ -16,6 +17,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, assetsIds, concurrentCount } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsAssets(userId, assetsIds);
     const assetsData = await u
       .db("o_assets")
       .where("type", "audio")

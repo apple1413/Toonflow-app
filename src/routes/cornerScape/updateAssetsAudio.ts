@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsAsset, assertOwnsAssets } from "@/utils/ownership";
 const router = express.Router();
 
 // 新增资产
@@ -14,6 +15,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { assetsId, audioIds } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsAsset(userId, assetsId);
+    if (audioIds.length) await assertOwnsAssets(userId, audioIds);
     await u.db("o_assetsRole2Audio").where("assetsRoleId", assetsId).delete();
     if (audioIds.length) {
       await u.db("o_assetsRole2Audio").insert(audioIds.map((i: number) => ({ assetsRoleId: assetsId, assetsAudioId: i })));
