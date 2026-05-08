@@ -7,7 +7,12 @@ import sharp from "sharp";
 // 规范化路径：去除前导斜杠，并将路径分隔符统一转换为系统分隔符
 function normalizeUserPath(userPath: string): string {
   // 去除前导的 / 或 \
-  const trimmedPath = userPath.replace(/^[/\\]+/, "");
+  let trimmedPath = userPath.replace(/^[/\\]+/, "");
+  // 兜底：循环剥掉前导的 oss/ 段（oss 根目录下不会有合法的 oss/ 子目录，可安全剥离）
+  // 注意不要剥 smallImage/，它是合法子目录
+  while (/^oss[/\\]/i.test(trimmedPath)) {
+    trimmedPath = trimmedPath.replace(/^oss[/\\]+/i, "");
+  }
   // 将所有 / 替换为系统路径分隔符（path.sep）
   // 这样在 Windows 上会转为 \，在 Unix 上保持 /
   return trimmedPath.split("/").join(path.sep);

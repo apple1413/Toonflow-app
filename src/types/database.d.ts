@@ -206,6 +206,9 @@ export interface o_tasks {
   'taskClass'?: string | null;
 }
 export interface o_user {
+  'createTime'?: number | null;
+  'email'?: string | null;
+  'externalId'?: string | null;
   'id'?: number;
   'name'?: string | null;
   'password'?: string | null;

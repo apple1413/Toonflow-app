@@ -1,10 +1,9 @@
 import { readFile, writeFile } from "fs/promises";
-import getPath from "@/utils/getPath";
+import getPath, { isEletron } from "@/utils/getPath";
 import fs from "fs";
 import path from "path";
-import knex from "knex";
+import knex, { Knex } from "knex";
 import initDB from "@/lib/initDB";
-// import fixDB from "@/lib/fixDB";
 import type { DB } from "@/types/database";
 import crypto from "crypto";
 import fixDB from "@/lib/fixDB";
@@ -12,33 +11,52 @@ import fixDB from "@/lib/fixDB";
 type TableName = keyof DB & string;
 type RowType<TName extends TableName> = DB[TName];
 
-const dbPath = getPath("db2.sqlite");
-console.log("数据库目录:", dbPath);
-const dbDir = path.dirname(dbPath);
+// Electron 桌面端永远使用本地 SQLite；只有非 Electron（SaaS server）才看 DATABASE_URL
+const useCloudDb = !isEletron() && !!process.env.DATABASE_URL;
 
-// 确保数据库目录存在
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+let db: Knex;
+if (useCloudDb) {
+  console.log("数据库: Postgres (DATABASE_URL) schema=toonflow");
+  db = knex({
+    client: "pg",
+    connection: {
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // Supabase 强制 SSL，证书链由托管侧管理
+    },
+    // 把 Toonflow 表隔离到独立 schema，避免与库里其他产品表名冲突
+    // 第二项 public 用于读取共享对象（如 extension）；写入永远落到第一项 toonflow
+    searchPath: ["toonflow", "public"],
+    pool: { min: 0, max: 10 },
+  });
+} else {
+  const dbPath = getPath("db2.sqlite");
+  console.log("数据库目录:", dbPath);
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, "");
+  }
+  db = knex({
+    client: "better-sqlite3",
+    connection: { filename: dbPath },
+    useNullAsDefault: true,
+  });
 }
 
-// 创建空数据库文件
-if (!fs.existsSync(dbPath)) {
-  fs.writeFileSync(dbPath, "");
+let initPromise: Promise<void> | null = null;
+export function initDb(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      await initDB(db);
+      await fixDB(db);
+      // 类型同步只在 SQLite 路径跑，避免 dev 机器在 cloud DB 下覆写为 pg 衍生类型
+      if (process.env.NODE_ENV == "dev" && !useCloudDb) await initKnexType(db);
+    })();
+  }
+  return initPromise;
 }
-
-const db = knex({
-  client: "better-sqlite3",
-  connection: {
-    filename: dbPath,
-  },
-  useNullAsDefault: true,
-});
-
-(async () => {
-  await initDB(db);
-  await fixDB(db);
-  if (process.env.NODE_ENV == "dev") initKnexType(db);
-})();
 
 const dbClient = Object.assign(<TName extends TableName>(table: TName) => db<RowType<TName>, RowType<TName>[]>(table), db);
 dbClient.schema = db.schema;

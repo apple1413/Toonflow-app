@@ -7,10 +7,11 @@ import axios from "axios";
 const router = express.Router();
 
 async function urlToBase64(imageUrl: string): Promise<string> {
-  if (imageUrl.startsWith("/oss/")) {
-    return await u.oss.getImageBase64(u.replaceUrl(imageUrl).replace("/smallImage", ""));
+  // replaceUrl 已统一剥离 /oss 和 /smallImage 前缀，本地文件直接读
+  const isLocal = /^\/(oss|smallImage)\//.test(imageUrl) || !/^https?:\/\//i.test(imageUrl);
+  if (isLocal) {
+    return await u.oss.getImageBase64(u.replaceUrl(imageUrl));
   }
-  imageUrl = await u.oss.getFileUrl(u.replaceUrl(imageUrl))
   const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
   const contentType = response.headers["content-type"] || "image/png";
   const base64 = Buffer.from(response.data, "binary").toString("base64");

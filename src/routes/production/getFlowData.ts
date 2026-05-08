@@ -85,7 +85,7 @@ export default router.post(
       return res.status(200).send(success(flowData));
     } else {
       try {
-        const storyboardData = await u.db("o_storyboard").where("scriptId", episodesId);
+        const storyboardData = await u.db("o_storyboard").where({ scriptId: episodesId, projectId });
 
         await Promise.all(
           storyboardData.map(async (i) => {
@@ -151,6 +151,8 @@ export default router.post(
             shouldGenerateImage: i.shouldGenerateImage,
             reason: i?.reason ?? "",
             flowId: i.flowId,
+            track: i.track,
+            trackId: i.trackId,
           }))
           .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
         res.status(200).send(success(flowData));

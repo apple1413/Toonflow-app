@@ -14,6 +14,7 @@ import u from "@/utils";
 import jwt from "jsonwebtoken";
 import socketInit from "@/socket/index";
 import { isEletron } from "@/utils/getPath";
+import { initDb } from "@/utils/db";
 
 const app = express();
 const server = http.createServer(app);
@@ -44,6 +45,7 @@ async function checkPermissions() {
 
 export default async function startServe(randomPort: Boolean = false) {
   await checkPermissions();
+  await initDb(); // schema/迁移就绪后再注册路由
 
   await u.writeVersion();
   const io = new Server(server, { cors: { origin: "*" } });
@@ -65,6 +67,15 @@ export default async function startServe(randomPort: Boolean = false) {
   }
   console.log("文件目录:", ossDir);
   app.use("/oss", express.static(ossDir, { acceptRanges: false }));
+  // 兼容前端用 OSSURL + filePath 拼接（filePath 已含项目目录）的旧路径
+  app.use(
+    (req, res, next) => {
+      if (/^\/\d+\/.+\.(jpe?g|png|gif|webp|svg|bmp|mp4|mp3|wav|m4a)$/i.test(req.path)) {
+        return express.static(ossDir, { acceptRanges: false })(req, res, next);
+      }
+      next();
+    },
+  );
   // skills 静态资源
   const skillsDir = u.getPath("skills");
   if (!fs.existsSync(skillsDir)) {
@@ -106,6 +117,7 @@ export default async function startServe(randomPort: Boolean = false) {
     const token = rawToken.replace("Bearer ", "");
     // 白名单路径
     if (req.path === "/api/login/login") return next();
+    if (req.path === "/api/login/sso") return next();
 
     if (!token) return res.status(401).send({ message: "未提供token" });
     try {

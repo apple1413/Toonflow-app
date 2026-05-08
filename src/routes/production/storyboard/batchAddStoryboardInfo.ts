@@ -47,7 +47,7 @@ export default router.post(
       }
       item.id = id;
     }
-    const lastStoryboard = await u.db("o_storyboard").where("scriptId", scriptId);
+    const lastStoryboard = await u.db("o_storyboard").where({ scriptId, projectId });
     if (!lastStoryboard || !lastStoryboard.length) return res.status(400).send(error("未查到分镜数据"));
     //根据track分组
     const storyboardGroupByTrack: Record<string, number[]> = {};
@@ -67,8 +67,8 @@ export default router.post(
         .filter((item: any) => item.track == track)
         .reduce((sum: number, item: any) => sum + Number(item.duration), 0);
 
-      // 查找该scriptId下是否已有相同track名称且已分配trackId的分镜记录
-      const existingStoryboard = await u.db("o_storyboard").where({ scriptId, track }).whereNotNull("trackId").first();
+      // 查找该项目下是否已有相同track名称且已分配trackId的分镜记录
+      const existingStoryboard = await u.db("o_storyboard").where({ projectId, scriptId, track }).whereNotNull("trackId").first();
 
       let trackId: number;
       if (existingStoryboard?.trackId) {

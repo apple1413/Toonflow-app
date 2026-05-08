@@ -35,6 +35,7 @@ import route31 from "./routes/general/generalStatistics";
 import route32 from "./routes/general/getSingleProject";
 import route33 from "./routes/general/updateProject";
 import route34 from "./routes/login/login";
+import routeSso from "./routes/login/sso";
 import route35 from "./routes/modelSelect/getModelDetail";
 import route36 from "./routes/modelSelect/getModelList";
 import route37 from "./routes/novel/addNovel";
@@ -190,6 +191,7 @@ export default async (app: Express) => {
   app.use("/api/general/getSingleProject", route32);
   app.use("/api/general/updateProject", route33);
   app.use("/api/login/login", route34);
+  app.use("/api/login/sso", routeSso);
   app.use("/api/modelSelect/getModelDetail", route35);
   app.use("/api/modelSelect/getModelList", route36);
   app.use("/api/novel/addNovel", route37);

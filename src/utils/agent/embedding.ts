@@ -9,10 +9,24 @@ import db from "@/utils/db";
 // const modelOnnxFile = ["all-MiniLM-L6-v2", "onnx", "model_fp16.onnx"]; // 模型文件路径
 // const modelDtype = "fp16" as const; // 量化类型：fp32
 let extractor: FeatureExtractionPipeline | null = null;
+let initPromise: Promise<void> | null = null;
 
 export async function initEmbedding(): Promise<void> {
   if (extractor) return;
+  // 并发去重：seed 阶段会被 Promise.all 同时触发多次，避免重复查 o_setting / 重复加载模型
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    await doInitEmbedding();
+  })();
+  try {
+    await initPromise;
+  } finally {
+    // 失败也清掉，让下次调用能重试（成功路径下 extractor 已设，再进来会被首行短路）
+    if (!extractor) initPromise = null;
+  }
+}
 
+async function doInitEmbedding(): Promise<void> {
   const modelConfigData = await db("o_setting").whereIn("key", ["modelOnnxFile", "modelDtype"]);
   const modelObj: Record<string, string> = {};
   Object.entries(modelConfigData).forEach(([key, value]) => {

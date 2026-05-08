@@ -9,10 +9,13 @@ export default router.post(
   "/",
   validateFields({
     scriptId: z.number(),
+    projectId: z.number().optional(),
   }),
   async (req, res) => {
-    const { scriptId } = req.body;
-    const storyboardData = await u.db("o_storyboard").where({ scriptId }).orderBy("index", "asc");
+    const { scriptId, projectId } = req.body;
+    const baseQuery = u.db("o_storyboard").where({ scriptId });
+    if (projectId != null) baseQuery.andWhere({ projectId });
+    const storyboardData = await baseQuery.orderBy("index", "asc");
     const data = await Promise.all(
       storyboardData.map(async (i) => {
         return {

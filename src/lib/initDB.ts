@@ -9,16 +9,25 @@ interface TableSchema {
 }
 
 export default async (knex: Knex, forceInit: boolean = false): Promise<void> => {
+  // 多产品共用 Postgres 库时，把 Toonflow 表隔离到独立 schema
+  // SQLite 没有 schema 概念，跳过；CREATE SCHEMA IF NOT EXISTS 是幂等操作
+  if ((knex.client.config?.client) === "pg") {
+    await knex.raw(`CREATE SCHEMA IF NOT EXISTS toonflow`);
+  }
+
   const tables: TableSchema[] = [
     // 用户表
     {
       name: "o_user",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("name");
         table.text("password");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.text("externalId"); // 外部身份提供方（如 shipany）的用户 id
+        table.text("email");
+        table.bigInteger("createTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
+        table.unique(["externalId"]);
       },
       initData: async (knex) => {
         await knex("o_user").insert([{ id: 1, name: "admin", password: "admin123" }]);
@@ -28,7 +37,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_project",
       builder: (table) => {
-        table.integer("id");
+        table.bigIncrements("id");
         table.string("projectType");
         table.string("imageModel");
         table.string("imageQuality");
@@ -40,23 +49,21 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         table.text("directorManual");
         table.text("mode");
         table.text("videoRatio");
-        table.integer("createTime");
-        table.integer("userId");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("createTime");
+        table.bigInteger("userId");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //风格表
     {
       name: "o_artStyle",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.string("name");
         table.text("fileUrl");
         table.text("label");
         table.text("prompt");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => { },
     },
@@ -64,18 +71,17 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_agentDeploy",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.string("model");
         table.string("key");
         table.string("modelName");
         table.text("vendorId");
         table.string("desc");
         table.string("name");
-        table.integer("temperature");
-        table.integer("maxOutputTokens");
+        table.bigInteger("temperature");
+        table.bigInteger("maxOutputTokens");
         table.boolean("disabled").defaultTo(false);
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => {
         await knex("o_agentDeploy").insert([
@@ -320,17 +326,16 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_tasks",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("projectId");
+        table.bigIncrements("id");
+        table.bigInteger("projectId");
         table.string("taskClass");
         table.string("relatedObjects");
         table.string("model");
         table.text("describe");
         table.string("state");
-        table.integer("startTime");
+        table.bigInteger("startTime");
         table.text("reason");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => { },
     },
@@ -338,13 +343,12 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_prompt",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.string("name");
         table.string("type");
         table.text("data");
         table.text("useData");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => {
         await knex("o_prompt").insert([
@@ -370,12 +374,11 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_modelPrompt",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.string("vendorId");
         table.string("model");
         table.text("prompt");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => { },
     },
@@ -383,78 +386,86 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_novel",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("chapterIndex");
+        table.bigIncrements("id");
+        table.bigInteger("chapterIndex");
         table.text("reel");
         table.text("chapter");
         table.text("chapterData");
-        table.integer("projectId");
-        table.integer("eventState");
+        table.bigInteger("projectId");
+        table.bigInteger("eventState");
         table.text("event");
         table.text("errorReason");
-        table.integer("createTime");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("createTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //小说事件表
     {
       name: "o_event",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.string("name");
         table.string("detail");
-        table.integer("createTime");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("createTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //事件-章节表
     {
       name: "o_eventChapter",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("eventId").unsigned().references("id").inTable("o_event");
-        table.integer("novelId").unsigned().references("id").inTable("o_novel");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigIncrements("id");
+        table.bigInteger("eventId").unsigned().references("id").inTable("o_event");
+        table.bigInteger("novelId").unsigned().references("id").inTable("o_novel");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
+    },
+    //大纲表
+    {
+      name: "o_outline",
+      builder: (table) => {
+        table.bigIncrements("id");
+        table.bigInteger("projectId");
+        table.text("name");
+        table.text("content");
+        table.bigInteger("createTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
+      },
+      initData: async (knex) => { },
     },
     //剧本
     {
       name: "o_script",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("name");
         table.text("content");
-        table.integer("projectId");
-        table.integer("extractState");
-        table.integer("createTime");
+        table.bigInteger("projectId");
+        table.bigInteger("extractState");
+        table.bigInteger("createTime");
         table.text("errorReason");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //资产表
     {
       name: "o_assets",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("name");
         table.text("prompt");
         table.text("remark");
         table.text("type");
         table.text("describe");
-        table.integer("scriptId"); //剧本id
-        table.integer("imageId").unsigned().references("id").inTable("o_image");
-        table.integer("assetsId");
-        table.integer("projectId");
-        table.integer("flowId"); //工作流id
-        table.integer("startTime");
+        table.bigInteger("scriptId"); //剧本id
+        table.bigInteger("imageId"); // FK 关系由应用层维护（避免与 o_image 表创建顺序耦合）
+        table.bigInteger("assetsId");
+        table.bigInteger("projectId");
+        table.bigInteger("flowId"); //工作流id
+        table.bigInteger("startTime");
         table.string("promptState");
         table.text("promptErrorReason");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => { },
     },
@@ -462,87 +473,84 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_image",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("filePath");
         table.text("type");
-        table.integer("assetsId");
+        table.bigInteger("assetsId");
         table.text("model");
         table.text("resolution");
         table.text("state");
         table.text("errorReason");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //分镜
     {
       name: "o_storyboard",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("scriptId");
+        table.bigIncrements("id");
+        table.bigInteger("scriptId");
         table.text("prompt");
         table.text("filePath");
         table.text("duration");
         table.text("state");
-        table.integer("trackId");
+        table.bigInteger("trackId");
         table.text("reason");
         table.text("track");
         table.text("videoDesc");
-        table.integer("shouldGenerateImage"); // 0 否  1 是
-        table.integer("projectId");
-        table.integer("flowId"); //工作流id
-        table.integer("index");
-        table.integer("createTime");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("shouldGenerateImage"); // 0 否  1 是
+        table.bigInteger("projectId");
+        table.bigInteger("flowId"); //工作流id
+        table.bigInteger("index");
+        table.bigInteger("createTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //flowData-剧本
     {
       name: "o_agentWorkData",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("projectId");
-        table.integer("episodesId");
+        table.bigIncrements("id");
+        table.bigInteger("userId");
+        table.bigInteger("projectId");
+        table.bigInteger("episodesId");
         table.string("key"); //用户其他方式索引
         table.string("data");
-        table.integer("createTime");
-        table.integer("updateTime");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("createTime");
+        table.bigInteger("updateTime");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
+        table.index(["userId"]);
       },
     },
     //视频
     {
       name: "o_video",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("filePath");
         table.text("errorReason");
-        table.integer("time");
+        table.bigInteger("time");
         table.text("state");
-        table.integer("scriptId");
-        table.integer("projectId");
-        table.integer("videoTrackId");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("scriptId");
+        table.bigInteger("projectId");
+        table.bigInteger("videoTrackId");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     // 视频轨道
     {
       name: "o_videoTrack",
       builder: (table) => {
-        table.integer("id").notNullable();
-        table.integer("videoId");
-        table.integer("projectId");
-        table.integer("scriptId");
+        table.bigIncrements("id");
+        table.bigInteger("videoId");
+        table.bigInteger("projectId");
+        table.bigInteger("scriptId");
         table.text("state");
         table.text("reason");
         table.text("prompt");
-        table.integer("selectVideoId");
-        table.integer("duration");
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("selectVideoId");
+        table.bigInteger("duration");
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     //供应商配置表
@@ -552,9 +560,8 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         table.string("id").notNullable();
         table.text("inputValues"); // 输入项值 JSON
         table.text("models"); // 模型配置 JSON
-        table.integer("enable"); //是否启用供应商
-        table.primary(["id"]);
-        table.unique(["id"]);
+        table.bigInteger("enable"); //是否启用供应商
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
       initData: async (knex) => {
         await knex("o_vendorConfig").insert([
@@ -601,17 +608,16 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_imageFlow",
       builder: (table) => {
-        table.integer("id").notNullable();
+        table.bigIncrements("id");
         table.text("flowData").notNullable();
-        table.primary(["id"]);
-        table.unique(["id"]);
+        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
       },
     },
     {
       name: "o_assets2Storyboard",
       builder: (table) => {
-        table.integer("storyboardId").notNullable();
-        table.integer("assetId").notNullable();
+        table.bigInteger("storyboardId").notNullable();
+        table.bigInteger("assetId").notNullable();
         table.primary(["storyboardId", "assetId"]);
         table.unique(["storyboardId", "assetId"]);
       },
@@ -619,8 +625,8 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_scriptAssets",
       builder: (table) => {
-        table.integer("scriptId").notNullable();
-        table.integer("assetId").notNullable();
+        table.bigInteger("scriptId").notNullable();
+        table.bigInteger("assetId").notNullable();
         table.primary(["scriptId", "assetId"]);
         table.unique(["scriptId", "assetId"]);
       },
@@ -629,16 +635,18 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
       name: "o_skillList",
       builder: (table) => {
         table.text("id").notNullable();
+        table.bigInteger("userId"); // null 表示系统内置技能（全局共享）
         table.text("md5").notNullable();
         table.text("path").notNullable();
         table.text("name").notNullable(); //文件名
         table.text("description").notNullable(); //描述
         table.text("embedding"); // 向量嵌入 JSON
         table.text("type").notNullable(); // "main" | "references"
-        table.integer("createTime").notNullable();
-        table.integer("updateTime").notNullable();
-        table.integer("state").notNullable(); // 1正常，0正在生成description，-1description为空。-2归属为空,-3md5变动，-4文件不存在
+        table.bigInteger("createTime").notNullable();
+        table.bigInteger("updateTime").notNullable();
+        table.bigInteger("state").notNullable(); // 1正常，0正在生成description，-1description为空。-2归属为空,-3md5变动，-4文件不存在
         table.primary(["id"]);
+        table.index(["userId"]);
       },
       initData: async (knex) => {
         const list = [
@@ -992,6 +1000,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
       name: "memories",
       builder: (table) => {
         table.text("id").notNullable();
+        table.bigInteger("userId");
         table.text("isolationKey").notNullable(); // 记忆隔离键
         table.text("type").notNullable(); // 'message' | 'summary'
         table.text("role"); // 'user' | 'assistant'
@@ -999,9 +1008,10 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         table.text("content").notNullable();
         table.text("embedding"); // 向量嵌入 JSON
         table.text("relatedMessageIds"); // summary关联的message id列表 JSON
-        table.integer("summarized").defaultTo(0); // message是否已被总结 0/1
-        table.integer("createTime").notNullable();
+        table.bigInteger("summarized").defaultTo(0); // message是否已被总结 0/1
+        table.bigInteger("createTime").notNullable();
         table.primary(["id"]);
+        table.index(["userId", "isolationKey"]);
         table.index(["isolationKey", "type"]);
         table.index(["isolationKey", "summarized"]);
       },
@@ -1009,8 +1019,8 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     {
       name: "o_assetsRole2Audio",
       builder: (table) => {
-        table.integer("assetsRoleId").notNullable();
-        table.integer("assetsAudioId").notNullable();
+        table.bigInteger("assetsRoleId").notNullable();
+        table.bigInteger("assetsAudioId").notNullable();
         table.primary(["assetsAudioId", "assetsRoleId"]);
         table.unique(["assetsAudioId", "assetsRoleId"]);
       },
@@ -1031,6 +1041,61 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         await t.initData(knex);
         console.log("[初始化数据库] 表数据初始化:", t.name);
       }
+    }
+  }
+
+  // 为已存在的旧库平滑补列（不影响新库）
+  type ColPatch = { table: string; col: string; add: (t: Knex.AlterTableBuilder) => void };
+  const columnPatches: ColPatch[] = [
+    { table: "o_user", col: "externalId", add: (t) => t.text("externalId") },
+    { table: "o_user", col: "email", add: (t) => t.text("email") },
+    { table: "o_user", col: "createTime", add: (t) => t.integer("createTime") },
+    // SaaS 多租户：按用户隔离的表补 userId
+    { table: "o_agentWorkData", col: "userId", add: (t) => t.integer("userId") },
+    { table: "o_skillList", col: "userId", add: (t) => t.integer("userId") },
+    { table: "memories", col: "userId", add: (t) => t.integer("userId") },
+  ];
+  for (const p of columnPatches) {
+    if (!(await knex.schema.hasTable(p.table))) continue;
+    if (!(await knex.schema.hasColumn(p.table, p.col))) {
+      await knex.schema.alterTable(p.table, p.add);
+      console.log(`[初始化数据库] ${p.table} 补列:`, p.col);
+    }
+  }
+  // 旧库补必要索引（SQLite/Postgres 都支持 IF NOT EXISTS 语法）
+  // 注意：pg 默认会把无引号标识符转小写，camelCase 列名必须用双引号
+  const indexPatches: { sql: string; desc: string }[] = [
+    {
+      sql: `CREATE UNIQUE INDEX IF NOT EXISTS o_user_externalId_unique ON o_user("externalId") WHERE "externalId" IS NOT NULL`,
+      desc: "o_user.externalId 唯一索引",
+    },
+    { sql: `CREATE INDEX IF NOT EXISTS o_agentWorkData_userId_idx ON "o_agentWorkData"("userId")`, desc: "o_agentWorkData.userId 索引" },
+    { sql: `CREATE INDEX IF NOT EXISTS o_skillList_userId_idx ON "o_skillList"("userId")`, desc: "o_skillList.userId 索引" },
+    { sql: `CREATE INDEX IF NOT EXISTS memories_userId_isolationKey_idx ON memories("userId", "isolationKey")`, desc: "memories.userId+isolationKey 索引" },
+  ];
+  for (const p of indexPatches) {
+    try {
+      await knex.raw(p.sql);
+    } catch (e) {
+      console.warn(`[初始化数据库] 创建 ${p.desc} 失败:`, e);
+    }
+  }
+
+  // 老 Electron 数据回填 userId（旧库里没有 userId 概念，统一归 admin id=1）
+  const backfillTargets: { table: string; col: string }[] = [
+    { table: "o_project", col: "userId" },
+    { table: "o_agentWorkData", col: "userId" },
+    { table: "o_skillList", col: "userId" }, // 老库里的技能默认归 admin
+    { table: "memories", col: "userId" },
+  ];
+  for (const t of backfillTargets) {
+    try {
+      if (!(await knex.schema.hasTable(t.table))) continue;
+      if (!(await knex.schema.hasColumn(t.table, t.col))) continue;
+      const updated = await knex(t.table).whereNull(t.col).update({ [t.col]: 1 });
+      if (updated > 0) console.log(`[初始化数据库] 回填 ${t.table}.${t.col} = 1（共 ${updated} 行）`);
+    } catch (e) {
+      console.warn(`[初始化数据库] 回填 ${t.table}.${t.col} 失败:`, e);
     }
   }
 };
