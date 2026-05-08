@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { id } from "zod/locales";
+import { userIdOf, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 // 更新资产
@@ -18,6 +19,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id, name, describe, remark, prompt } = req.body;
+    await assertOwnsAsset(userIdOf(req), id);
     await u.db("o_assets").where({ id }).update({
       name,
       describe,

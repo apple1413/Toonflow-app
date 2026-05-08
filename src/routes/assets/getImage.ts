@@ -3,6 +3,7 @@ import u from "@/utils";
 import { success } from "@/lib/responseFormat";
 import { z } from "zod";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 // 获取生成图片
@@ -13,6 +14,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { assetsId } = req.body;
+    await assertOwnsAsset(userIdOf(req), assetsId);
 
     const assets = await u.db("o_assets").where("id", assetsId).select("id", "imageId", "type").first();
 

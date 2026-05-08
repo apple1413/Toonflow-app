@@ -4,6 +4,7 @@ import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
 import { v4 as uuid } from "uuid";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 根据 base64 头部获取文件扩展名
@@ -36,6 +37,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { base64Data, projectId, type = "clip", name } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
     const ext = getExtFromBase64(base64Data);
     const savePath = `/${projectId}/assets/${uuid()}.${ext}`;
 

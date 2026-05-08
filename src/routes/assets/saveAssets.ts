@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { stat } from "original-fs";
+import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 // 保存资产图片
@@ -20,6 +21,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { id, base64, type, prompt, projectId, imageId } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsAsset(userId, id);
     if (base64) {
       //自定义上传选择的图片
       const matches = base64.match(/^data:image\/\w+;base64,(.+)$/);

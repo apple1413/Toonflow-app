@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 获取资产
@@ -17,6 +18,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, type, name, page = 1, limit = 10 } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
     const offset = (page - 1) * limit;
     let query = u.db("o_assets").select("*").where("projectId", projectId).andWhere("type", type);
     if (name) {
