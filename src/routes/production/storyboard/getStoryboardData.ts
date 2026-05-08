@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -15,6 +16,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { scriptId, page, limit, name } = req.body;
+    await assertOwnsScript(userIdOf(req), scriptId);
     const offset = (page - 1) * limit;
 
     const storyboardData = await u

@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsStoryboard } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -12,6 +13,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
+    await assertOwnsStoryboard(userIdOf(req), id);
     const storyboardData = await u.db("o_storyboard").where("id", id).select("id", "track", "trackId", "flowId").first();
     if (!storyboardData) return res.status(400).send(error("未找到该分镜"));
     if (storyboardData?.flowId) await u.db("o_imageFlow").where("id", storyboardData?.flowId).delete();

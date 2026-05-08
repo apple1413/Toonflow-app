@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 export default router.post(
   "/",
@@ -24,6 +25,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { data, scriptId, projectId } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
     if (!data.length) return res.status(400).send({ success: false, message: "数据不能为空" });
     for (const item of data) {
       const [id] = await u.db("o_storyboard").insert({

@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import sharp from "sharp";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsStoryboards } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -12,6 +13,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { storyboardIds } = req.body;
+    await assertOwnsStoryboards(userIdOf(req), storyboardIds);
     const storyboardImage = await u.db("o_storyboard").whereIn("id", storyboardIds).select("id", "filePath");
 
     // 按 storyboardIds 顺序构建 filePath 映射

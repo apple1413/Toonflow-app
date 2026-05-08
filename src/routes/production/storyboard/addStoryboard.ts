@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 interface Storyboard {
   id: number;
@@ -26,6 +27,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { prompt, duration, state, src, scriptId, projectId, videoDesc, shouldGenerateImage } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
     const trackId = Date.now()
     await u.db("o_videoTrack").insert({
       id: trackId,

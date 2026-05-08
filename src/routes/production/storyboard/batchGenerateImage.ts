@@ -6,6 +6,7 @@ import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { Output, tool } from "ai";
 import { assetItemSchema } from "@/agents/productionAgent/tools";
+import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsStoryboards } from "@/utils/ownership";
 const router = express.Router();
 export type AssetData = z.infer<typeof assetItemSchema>;
 
@@ -30,6 +31,10 @@ export default router.post(
       concurrentCount: number;
     } = req.body;
     if (!storyboardIds || storyboardIds.length === 0) return res.status(400).send(error("storyboardIds不能为空"));
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
+    await assertOwnsStoryboards(userId, storyboardIds);
     // 当没有 storyboardIds 时，通过 AI 生成新的分镜面板数据
     let finalStoryboardIds: number[] = storyboardIds || [];
     // shouldGenerateImage === 0 的分镜标记为「未生成」，其余标记为「生成中」
