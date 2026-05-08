@@ -12,6 +12,7 @@ export interface memories {
   'role'?: string | null;
   'summarized'?: number | null;
   'type': string;
+  'userId'?: number | null;
 }
 export interface o_agentDeploy {
   'desc'?: string | null;
@@ -35,6 +36,7 @@ export interface o_agentWorkData {
   'key'?: string | null;
   'projectId'?: number | null;
   'updateTime'?: number | null;
+  'userId'?: number | null;
 }
 export interface o_artStyle {
   'fileUrl'?: string | null;
@@ -176,6 +178,7 @@ export interface o_skillList {
   'state': number;
   'type': string;
   'updateTime': number;
+  'userId'?: number | null;
 }
 export interface o_storyboard {
   'createTime'?: number | null;
