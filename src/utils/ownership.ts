@@ -11,11 +11,15 @@ export class ForbiddenError extends Error {
   }
 }
 
-/** 从 express req 取当前登录 userId（JWT 中间件已注入 req.user） */
+/** 从 express req 取当前登录 userId（JWT 中间件已注入 req.user）
+ *  PG 在没设 bigint type parser 时会把 id 以 string 返回（旧 token 也可能是 string），
+ *  这里做一次安全收敛——只接受可解析为正整数的值。
+ */
 export function userIdOf(req: Request): number {
   const u = (req as any).user;
-  const id = u?.id;
-  if (typeof id !== "number" || !Number.isFinite(id)) {
+  const raw = u?.id;
+  const id = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) {
     throw new ForbiddenError("未登录或 token 无效");
   }
   return id;

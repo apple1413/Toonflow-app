@@ -16,6 +16,12 @@ const useCloudDb = !isEletron() && !!process.env.DATABASE_URL;
 
 let db: Knex;
 if (useCloudDb) {
+  // Postgres 默认把 BIGINT (OID 20) 当 string 返回防精度丢失，
+  // 但 Toonflow 的 id 都是 Date.now() 量级（~1.7e12，远小于 2^53），
+  // 解析回 number 让上层（JWT 载荷、ownership 校验、knex.where({ id })）行为与 SQLite 一致
+  const pg = require("pg");
+  pg.types.setTypeParser(20, (v: string) => (v == null ? null : parseInt(v, 10)));
+
   console.log("数据库: Postgres (DATABASE_URL) schema=toonflow");
   db = knex({
     client: "pg",

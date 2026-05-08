@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf } from "@/utils/ownership";
 const router = express.Router();
 
 // 新增项目
@@ -22,6 +23,7 @@ export default router.post(
     mode: z.string(),
   }),
   async (req, res) => {
+    const userId = userIdOf(req);
     const { projectType, name, intro, type, directorManual, artStyle, videoRatio, imageModel, videoModel, imageQuality, mode } = req.body;
 
     await u.db("o_project").insert({
@@ -33,7 +35,7 @@ export default router.post(
       artStyle,
       videoRatio,
       directorManual,
-      userId: 1,
+      userId,
       imageModel,
       videoModel,
       createTime: Date.now(),
