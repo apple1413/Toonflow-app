@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 import { FlowData } from "@/agents/productionAgent/tools";
 
@@ -14,6 +15,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, episodesId }: { projectId: number; episodesId: number } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, episodesId);
     const sqlData = await u
       .db("o_agentWorkData")
       .where("projectId", String(projectId))

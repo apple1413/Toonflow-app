@@ -4,6 +4,7 @@ import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
 import { v4 as uuid } from "uuid";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 
 // 文件上传（支持图片、音频、视频）
@@ -16,6 +17,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { base64Data, projectId, scriptId } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
     function getExtFromBase64(base64Data: string): string {
       const mime = base64Data.match(/^data:([^;]+);base64,/)?.[1] ?? "";
       const mimeMap: Record<string, string> = {

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { id } from "zod/locales";
+import { userIdOf, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -15,6 +16,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id, url, flowId } = req.body;
+    await assertOwnsAsset(userIdOf(req), id);
     const [imageId] = await u.db("o_image").insert({
       filePath: u.replaceUrl(url),
       state: "已完成",

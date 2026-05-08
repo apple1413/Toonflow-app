@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { Output } from "ai";
+import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsAssets } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -17,6 +18,10 @@ export default router.post(
   }),
   async (req, res) => {
     const { assetIds, projectId, scriptId, concurrentCount = 5 } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, scriptId);
+    await assertOwnsAssets(userId, assetIds);
 
     const projectSettingData = await u.db("o_project").where("id", projectId).select("imageModel", "imageQuality", "artStyle").first();
 

@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsImageFlow } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -14,6 +15,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { edges, nodes, flowId } = req.body;
+    await assertOwnsImageFlow(userIdOf(req), flowId);
     nodes.forEach((node: any) => {
       if (node.type == "upload") {
         node.data.image = node.data.image ? u.replaceUrl(node.data.image) : "";

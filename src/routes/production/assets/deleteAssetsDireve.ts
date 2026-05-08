@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -13,6 +14,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { id, projectId } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsAsset(userId, id);
     const assetsFirstData = await u.db("o_assets").where("id", id).first();
     if (!assetsFirstData) {
       return res.status(404).send({ error: "资源未找到" });

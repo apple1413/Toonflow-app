@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 const router = express.Router();
 import { flowDataSchema } from "@/agents/productionAgent/tools";
 
@@ -23,6 +24,9 @@ export default router.post(
       projectId: number;
       episodesId: number;
     } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsScript(userId, episodesId);
     const sqlData = await u.db("o_agentWorkData").where("projectId", String(projectId)).andWhere("episodesId", String(episodesId)).first();
     const filterDatas = data.storyboard.filter((i) => !i.id);
     if (data.storyboard && data.storyboard.length && !filterDatas.length) {

@@ -134,3 +134,15 @@ export async function assertOwnsEvents(userId: number, eventIds: unknown[]): Pro
 }
 
 export const assertOwnsEvent = (uid: number, id: unknown) => assertOwnsEvents(uid, [id]);
+
+/** o_imageFlow 自身不带 userId/projectId，靠 o_storyboard.flowId 或 o_assets.flowId 反查
+ *  flow 存在但没有任何引用时视为孤儿，拒绝读/写
+ */
+export async function assertOwnsImageFlow(userId: number, flowId: unknown): Promise<void> {
+  const fid = toId(flowId);
+  const fromStoryboard = await db("o_storyboard").where({ flowId: fid }).select("projectId").first();
+  const fromAsset = await db("o_assets").where({ flowId: fid }).select("projectId").first();
+  const projectId = fromStoryboard?.projectId ?? fromAsset?.projectId;
+  if (projectId == null) throw new ForbiddenError("工作流不存在或未关联到任何项目");
+  await assertOwnsProject(userId, projectId);
+}
