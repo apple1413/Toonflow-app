@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 获取项目概览统计
@@ -13,6 +14,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId } = req.body;
+    await assertOwnsProject(userIdOf(req), projectId);
 
     const scripts = await u.db("o_script").where("projectId", projectId).select("id");
     const scriptIds = scripts.map((item: any) => item.id);

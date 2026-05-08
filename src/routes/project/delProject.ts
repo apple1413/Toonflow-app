@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject } from "@/utils/ownership";
 const router = express.Router();
 
 // 删除项目
@@ -13,6 +14,8 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
+    // 必须先确认这个项目归当前用户，否则后面整串级联删会变成对他人项目的破坏
+    await assertOwnsProject(userIdOf(req), id);
     //删除项目
     await u.db("o_project").where("id", id).delete();
     await u.db("o_agentWorkData").where("projectId", id).delete();
