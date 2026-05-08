@@ -4,6 +4,7 @@ import pLimit from "p-limit";
 import * as zod from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsAssets } from "@/utils/ownership";
 const router = express.Router();
 interface OutlineItem {
   description: string;
@@ -44,14 +45,16 @@ export default router.post(
   }),
   async (req, res) => {
     const { projectId, items, concurrentCount } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    const assetsIds = items.map((item: { assetsId: number }) => item.assetsId);
+    await assertOwnsAssets(userId, assetsIds);
     //获取风格
     const project = await u.db("o_project").where("id", projectId).select("artStyle", "type", "intro").first();
     //如果没有找到对应的项目，返回错误
     if (!project) return res.status(500).send(success({ message: "项目为空" }));
 
-    // 预加载公共数据
-    const assetsIds = items.map((item: { assetsId: number }) => item.assetsId);
-    //查询所有资产，用于判断每个资产是否是衍生资产
+    // 预加载公共数据：查询所有资产，用于判断每个资产是否是衍生资产
     const assetsDataList = await u.db("o_assets").whereIn("id", assetsIds).select("id", "assetsId");
     if (!assetsDataList || assetsDataList.length === 0) return res.status(500).send(error("资产不存在"));
     const assetsDataMap = new Map(assetsDataList.map((a: any) => [a.id, a]));

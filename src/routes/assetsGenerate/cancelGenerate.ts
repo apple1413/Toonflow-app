@@ -3,9 +3,10 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsImage } from "@/utils/ownership";
 const router = express.Router();
 
-// 取消生成
+// 取消生成（id 是 o_image 的主键）
 export default router.post(
   "/",
   validateFields({
@@ -13,7 +14,7 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
-    console.log("%c Line:16 🌭 id", "background:#2eafb0", id);
+    await assertOwnsImage(userIdOf(req), id);
     await u.db("o_image").where("id", id).update({
       state: "生成失败",
     });

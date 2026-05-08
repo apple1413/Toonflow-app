@@ -3,6 +3,7 @@ import u from "@/utils";
 import * as zod from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
 const router = express.Router();
 
 
@@ -20,6 +21,9 @@ export default router.post(
   }),
   async (req, res) => {
     const { assetsId, projectId, type, name, describe } = req.body;
+    const userId = userIdOf(req);
+    await assertOwnsProject(userId, projectId);
+    await assertOwnsAsset(userId, assetsId);
     //获取风格
     const project = await u.db("o_project").where("id", projectId).select("artStyle", "type", "intro").first();
     //如果没有找到对应的项目，返回错误

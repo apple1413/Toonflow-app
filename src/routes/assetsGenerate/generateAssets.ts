@@ -4,6 +4,7 @@ import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
 
 const router = express.Router();
 
@@ -73,6 +74,9 @@ const requestSchema = {
 
 export default router.post("/", validateFields(requestSchema), async (req, res) => {
   const { projectId, model, resolution, id, type, name, prompt, base64 } = req.body;
+  const userId = userIdOf(req);
+  await assertOwnsProject(userId, projectId);
+  await assertOwnsAsset(userId, id);
 
   // 1. 查询项目 & 获取类型配置
   const project = await u.db("o_project").where("id", projectId).select("artStyle", "type", "intro").first();
