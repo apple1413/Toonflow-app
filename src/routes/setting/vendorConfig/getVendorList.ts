@@ -1,23 +1,26 @@
 import express from "express";
 import { success } from "@/lib/responseFormat";
 import u from "@/utils";
-import { assertAdmin } from "@/utils/ownership";
+import { userIdOf } from "@/utils/ownership";
+import { fallthroughList } from "@/utils/perUserSetting";
 const router = express.Router();
 
-// 直接回显 inputValues（含 API key 等敏感字段），仅 admin 可见。
-// 等 P3-a 拍方向后若改为 vendor per-user，再按当前用户过滤
+// per-user vendor 配置：每个用户的 inputValues（API key 等）独立
+// fall-through：用户行优先 → admin 行（不存在）→ NULL 系统默认（vendor type）
+// vendor 文件系统的 code/description/inputs 由 u.vendor.getVendor 读，全局共享
 export default router.post("/", async (req, res) => {
-  assertAdmin(req);
-  const data = await u.db("o_vendorConfig").select("*");
+  const userId = userIdOf(req);
+  const data = await fallthroughList<any>("o_vendorConfig", userId, "id");
 
   const list = (
     await Promise.all(
-      data.map(async (item) => {
+      data.map(async (item: any) => {
         const vendor = u.vendor.getVendor(item.id!);
         if (!vendor) {
+          // vendor 文件已不存在——用户/全局两份都清掉
           await u.db("o_vendorConfig").where("id", item.id).delete();
-          return null
-        };
+          return null;
+        }
         return {
           ...item,
           inputValues: JSON.parse(item.inputValues ?? "{}"),

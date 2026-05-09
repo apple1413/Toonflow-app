@@ -568,10 +568,13 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
       name: "o_vendorConfig",
       builder: (table) => {
         table.string("id").notNullable();
-        table.text("inputValues"); // 输入项值 JSON
-        table.text("models"); // 模型配置 JSON
+        table.text("inputValues"); // 输入项值 JSON（含 API key 等敏感数据）
+        table.text("models"); // 模型配置 JSON（vendor type 定义，全局共享）
         table.bigInteger("enable"); //是否启用供应商
-        // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
+        table.bigInteger("userId"); // NULL = 全局默认（vendor type）；非 NULL = 用户私有覆盖（主要是 inputValues）
+        // 复合唯一：(userId, id) + WHERE userId IS NULL 单独唯一 id（同 o_setting 模式）
+        table.unique(["userId", "id"]);
+        table.index(["id"]);
       },
       initData: async (knex) => {
         await knex("o_vendorConfig").insert([
@@ -1079,6 +1082,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_prompt", col: "userId", add: (t) => t.bigInteger("userId") },
     { table: "o_modelPrompt", col: "userId", add: (t) => t.bigInteger("userId") },
     { table: "o_setting", col: "userId", add: (t) => t.bigInteger("userId") }, // tokenKey 这种系统级 key 留 NULL
+    { table: "o_vendorConfig", col: "userId", add: (t) => t.bigInteger("userId") }, // NULL = vendor type 默认；非 NULL = 用户私有 inputValues
   ];
   for (const p of columnPatches) {
     if (!(await knex.schema.hasTable(p.table))) continue;
@@ -1106,6 +1110,11 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { sql: `ALTER TABLE "o_setting" DROP CONSTRAINT IF EXISTS o_setting_key_unique`, desc: "o_setting 移除老 unique(key)" },
     { sql: `CREATE UNIQUE INDEX IF NOT EXISTS o_setting_user_key_uniq ON "o_setting"("userId","key")`, desc: "o_setting (userId,key) 唯一" },
     { sql: `CREATE UNIQUE INDEX IF NOT EXISTS o_setting_global_key_uniq ON "o_setting"("key") WHERE "userId" IS NULL`, desc: "o_setting NULL 用户的 key 唯一（全局默认）" },
+    // o_vendorConfig 同 o_setting：原本 (id) 单列 PK；改成 (userId, id) 复合 + WHERE userId IS NULL 的 partial unique
+    { sql: `ALTER TABLE "o_vendorConfig" DROP CONSTRAINT IF EXISTS o_vendorConfig_pkey`, desc: "o_vendorConfig 移除老 PK(id)" },
+    { sql: `ALTER TABLE "o_vendorConfig" DROP CONSTRAINT IF EXISTS "o_vendorConfig_id_unique"`, desc: "o_vendorConfig 移除老 unique(id)" },
+    { sql: `CREATE UNIQUE INDEX IF NOT EXISTS "o_vendorConfig_user_id_uniq" ON "o_vendorConfig"("userId","id")`, desc: "o_vendorConfig (userId,id) 唯一" },
+    { sql: `CREATE UNIQUE INDEX IF NOT EXISTS "o_vendorConfig_global_id_uniq" ON "o_vendorConfig"("id") WHERE "userId" IS NULL`, desc: "o_vendorConfig NULL 用户的 id 唯一（vendor type 默认）" },
   ];
   for (const p of indexPatches) {
     try {
