@@ -135,14 +135,24 @@ export async function assertOwnsEvents(userId: number, eventIds: unknown[]): Pro
 
 export const assertOwnsEvent = (uid: number, id: unknown) => assertOwnsEvents(uid, [id]);
 
-/** o_imageFlow 自身不带 userId/projectId，靠 o_storyboard.flowId 或 o_assets.flowId 反查
- *  flow 存在但没有任何引用时视为孤儿，拒绝读/写
+/** o_imageFlow 归属判定：
+ *  1. 优先用 o_imageFlow.userId 直接判定（saveImageFlow 时会写入创建者）
+ *  2. 没有 userId 的旧行（可能为老库迁移过来的或在 saveImageFlow 加入 userId 之前创建的）
+ *     回退到 o_storyboard.flowId / o_assets.flowId 反查
+ *  3. 都查不到则视为孤儿，拒绝读/写
  */
 export async function assertOwnsImageFlow(userId: number, flowId: unknown): Promise<void> {
   const fid = toId(flowId);
+  const flowRow = await db("o_imageFlow").where({ id: fid }).select("userId").first();
+  if (flowRow == null) throw new ForbiddenError("工作流不存在");
+  if (flowRow.userId != null) {
+    if (Number(flowRow.userId) !== userId) throw new ForbiddenError("无权访问该工作流");
+    return;
+  }
+  // 老行没有 userId，沿引用反查
   const fromStoryboard = await db("o_storyboard").where({ flowId: fid }).select("projectId").first();
   const fromAsset = await db("o_assets").where({ flowId: fid }).select("projectId").first();
   const projectId = fromStoryboard?.projectId ?? fromAsset?.projectId;
-  if (projectId == null) throw new ForbiddenError("工作流不存在或未关联到任何项目");
+  if (projectId == null) throw new ForbiddenError("工作流未关联到任何项目");
   await assertOwnsProject(userId, projectId);
 }

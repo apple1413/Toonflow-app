@@ -93,6 +93,7 @@ export interface o_image {
 export interface o_imageFlow {
   'flowData': string;
   'id'?: number;
+  'userId'?: number | null;
 }
 export interface o_modelPrompt {
   'id'?: number;

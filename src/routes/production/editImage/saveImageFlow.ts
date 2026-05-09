@@ -3,6 +3,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -13,8 +14,8 @@ export default router.post(
   }),
   async (req, res) => {
     const { edges, nodes } = req.body;
+    const userId = userIdOf(req);
     nodes.forEach((node: any) => {
-      console.log("%c Line:17 🌮 node", "background:#465975", node);
       if (node.type == "upload") {
         node.data.image = node.data.image ? u.replaceUrl(node.data.image) : "";
       }
@@ -26,9 +27,12 @@ export default router.post(
         });
       }
     });
-    const [insertFlowId] = await u.db("o_imageFlow").insert({
+    // PG 默认 insert 不返回 lastInsertId，必须用 .returning('id') 显式拿；better-sqlite3 也支持
+    const [row] = await u.db("o_imageFlow").insert({
       flowData: JSON.stringify({ edges, nodes }),
-    });
+      userId,
+    }).returning("id");
+    const insertFlowId = typeof row === "object" ? (row as any).id : row;
     return res.status(200).send(success({ id: insertFlowId }));
   },
 );

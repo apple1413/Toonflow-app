@@ -9,9 +9,15 @@ interface TableSchema {
 }
 
 export default async (knex: Knex, forceInit: boolean = false): Promise<void> => {
+  const isPg = knex.client.config?.client === "pg";
+  // 安全护栏：forceInit 会 dropTable，仅在 Electron 本地 SQLite 上允许（重置本机数据）。
+  // 在 Postgres（SaaS / 远程库）上即使有 bug 让 forceInit 漏过来也直接拒绝，避免重蹈覆辙。
+  if (isPg && forceInit) {
+    throw new Error("[initDB] 拒绝在 Postgres 上以 forceInit=true 运行：会 DROP 所有 toonflow.* 表");
+  }
   // 多产品共用 Postgres 库时，把 Toonflow 表隔离到独立 schema
   // SQLite 没有 schema 概念，跳过；CREATE SCHEMA IF NOT EXISTS 是幂等操作
-  if ((knex.client.config?.client) === "pg") {
+  if (isPg) {
     await knex.raw(`CREATE SCHEMA IF NOT EXISTS toonflow`);
   }
 
@@ -610,7 +616,9 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
       builder: (table) => {
         table.bigIncrements("id");
         table.text("flowData").notNullable();
+        table.bigInteger("userId"); // 创建者，用于在 flow 还未关联 storyboard/asset 前判定归属
         // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
+        table.index(["userId"]);
       },
     },
     {
@@ -1045,15 +1053,18 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
   }
 
   // 为已存在的旧库平滑补列（不影响新库）
+  // 注意：userId 必须用 bigInteger（pg int8/sqlite integer），因为 user.id 是 Date.now() 量级（~1.7e12 > int4 上限 2.1e9）。
+  // 用 t.integer() 在 pg 会建成 4 字节 int4，新增用户 id 直接溢出。
   type ColPatch = { table: string; col: string; add: (t: Knex.AlterTableBuilder) => void };
   const columnPatches: ColPatch[] = [
     { table: "o_user", col: "externalId", add: (t) => t.text("externalId") },
     { table: "o_user", col: "email", add: (t) => t.text("email") },
-    { table: "o_user", col: "createTime", add: (t) => t.integer("createTime") },
+    { table: "o_user", col: "createTime", add: (t) => t.bigInteger("createTime") },
     // SaaS 多租户：按用户隔离的表补 userId
-    { table: "o_agentWorkData", col: "userId", add: (t) => t.integer("userId") },
-    { table: "o_skillList", col: "userId", add: (t) => t.integer("userId") },
-    { table: "memories", col: "userId", add: (t) => t.integer("userId") },
+    { table: "o_agentWorkData", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "o_skillList", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "memories", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "o_imageFlow", col: "userId", add: (t) => t.bigInteger("userId") },
   ];
   for (const p of columnPatches) {
     if (!(await knex.schema.hasTable(p.table))) continue;
@@ -1072,6 +1083,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { sql: `CREATE INDEX IF NOT EXISTS o_agentWorkData_userId_idx ON "o_agentWorkData"("userId")`, desc: "o_agentWorkData.userId 索引" },
     { sql: `CREATE INDEX IF NOT EXISTS o_skillList_userId_idx ON "o_skillList"("userId")`, desc: "o_skillList.userId 索引" },
     { sql: `CREATE INDEX IF NOT EXISTS memories_userId_isolationKey_idx ON memories("userId", "isolationKey")`, desc: "memories.userId+isolationKey 索引" },
+    { sql: `CREATE INDEX IF NOT EXISTS o_imageFlow_userId_idx ON "o_imageFlow"("userId")`, desc: "o_imageFlow.userId 索引" },
   ];
   for (const p of indexPatches) {
     try {
@@ -1087,6 +1099,7 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_agentWorkData", col: "userId" },
     { table: "o_skillList", col: "userId" }, // 老库里的技能默认归 admin
     { table: "memories", col: "userId" },
+    { table: "o_imageFlow", col: "userId" }, // 老 flow 没有归属概念，默认归 admin
   ];
   for (const t of backfillTargets) {
     try {
