@@ -5,6 +5,7 @@ import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
 import { getTokenKey } from "@/utils/tokenKey";
+import { verifyPassword, hashPassword } from "@/utils/password";
 const router = express.Router();
 
 export function setToken(payload: string | object, expiresIn: string | number, secret: string): string {
@@ -27,25 +28,36 @@ export default router.post(
     const data = await u.db("o_user").where("name", "=", username).first();
     if (!data) return res.status(400).send(error("登录失败"));
 
-    if (data!.password == password && data!.name == username) {
-      let tokenKey: string;
-      try {
-        tokenKey = await getTokenKey();
-      } catch {
-        return res.status(400).send(error("未找到tokenKey"));
-      }
-      const token = setToken(
-        {
-          id: data!.id,
-          name: data!.name,
-        },
-        "180Days",
-        tokenKey,
-      );
-
-      return res.status(200).send(success({ token: "Bearer " + token, name: data!.name, id: data!.id }, "登录成功"));
-    } else {
+    // 密码校验：bcrypt 哈希优先；老明文兼容比对，成功后趁机升级
+    const { ok, needsUpgrade } = await verifyPassword(password, data.password as string | null);
+    if (!ok || data.name !== username) {
       return res.status(400).send(error("用户名或密码错误"));
     }
+    if (needsUpgrade) {
+      try {
+        const hashed = await hashPassword(password);
+        await u.db("o_user").where("id", data.id).update({ password: hashed });
+      } catch (e) {
+        // 升级失败不阻塞登录，下次再试
+        console.warn("[login] 老明文密码升级 bcrypt 失败:", (e as any)?.message);
+      }
+    }
+
+    let tokenKey: string;
+    try {
+      tokenKey = await getTokenKey();
+    } catch {
+      return res.status(400).send(error("未找到tokenKey"));
+    }
+    const token = setToken(
+      {
+        id: data.id,
+        name: data.name,
+      },
+      "180Days",
+      tokenKey,
+    );
+
+    return res.status(200).send(success({ token: "Bearer " + token, name: data.name, id: data.id }, "登录成功"));
   },
 );
