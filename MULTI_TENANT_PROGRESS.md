@@ -1,7 +1,7 @@
 # Toonflow 多租户改造进度
 
 > **最后更新**：2026-05-09（深夜）— **P3 + P4 全部完结**
-> **本地分支**：`master`，比 `origin/master` 多 26 个未推 commit（用户暂不推送）
+> **本地分支**：`master`，比 `origin/master` 多 27 个未推 commit（含本文件入库；用户暂不推送）
 > **目标 DB**：Supabase 项目 `jhzanqsggzhvwjvlnule`，Toonflow 表落在独立 schema `toonflow`
 
 ---
