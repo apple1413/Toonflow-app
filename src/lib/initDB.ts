@@ -32,11 +32,13 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
         table.text("externalId"); // 外部身份提供方（如 shipany）的用户 id
         table.text("email");
         table.bigInteger("createTime");
+        table.text("role").defaultTo("user"); // 'admin' | 'user'，admin = isAdmin/assertAdmin 通过
+        table.boolean("disabled").defaultTo(false); // 软停用，登录/SSO 时拒绝
         // PK + UNIQUE 由 table.bigIncrements("id") 自动生成
         table.unique(["externalId"]);
       },
       initData: async (knex) => {
-        await knex("o_user").insert([{ id: 1, name: "admin", password: "admin123" }]);
+        await knex("o_user").insert([{ id: 1, name: "admin", password: "admin123", role: "admin" }]);
       },
     },
     //项目表
@@ -1062,6 +1064,11 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_user", col: "externalId", add: (t) => t.text("externalId") },
     { table: "o_user", col: "email", add: (t) => t.text("email") },
     { table: "o_user", col: "createTime", add: (t) => t.bigInteger("createTime") },
+    // 注意：columnPatch 路径下 role 不要 defaultTo——PG 的 ALTER ADD COLUMN ... DEFAULT 会把
+    // 存量行也立刻填成默认值，后面 `WHERE role IS NULL` 的回填就抓不到 admin 了。新建表
+    // builder 路径仍保留 defaultTo 给新行用。
+    { table: "o_user", col: "role", add: (t) => t.text("role") },
+    { table: "o_user", col: "disabled", add: (t) => t.boolean("disabled").defaultTo(false) },
     // SaaS 多租户：按用户隔离的表补 userId
     { table: "o_agentWorkData", col: "userId", add: (t) => t.bigInteger("userId") },
     { table: "o_skillList", col: "userId", add: (t) => t.bigInteger("userId") },
@@ -1122,6 +1129,18 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     // 注意：o_setting 不全量回填——tokenKey / switchAiDevTool 等系统级配置应保持 userId=NULL
     // 让它们对所有用户透明可见（fall-through 时 NULL 视同 admin 的全局默认）
   ];
+  // o_user.role 单独处理：name='admin' 的行升级到 role='admin'，其余保持默认 'user'
+  try {
+    if (await knex.schema.hasTable("o_user") && (await knex.schema.hasColumn("o_user", "role"))) {
+      const updated = await knex("o_user").where({ name: "admin" }).whereNull("role").update({ role: "admin" });
+      const updated2 = await knex("o_user").where({ id: 1 }).whereNull("role").update({ role: "admin" });
+      const fillRest = await knex("o_user").whereNull("role").update({ role: "user" });
+      const total = updated + updated2 + fillRest;
+      if (total > 0) console.log(`[初始化数据库] 回填 o_user.role（admin/user，共 ${total} 行）`);
+    }
+  } catch (e) {
+    console.warn("[初始化数据库] 回填 o_user.role 失败:", e);
+  }
   for (const t of backfillTargets) {
     try {
       if (!(await knex.schema.hasTable(t.table))) continue;

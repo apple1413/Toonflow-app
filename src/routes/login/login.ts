@@ -27,6 +27,7 @@ export default router.post(
 
     const data = await u.db("o_user").where("name", "=", username).first();
     if (!data) return res.status(400).send(error("登录失败"));
+    if ((data as any).disabled) return res.status(403).send(error("账号已停用，请联系管理员"));
 
     // 密码校验：bcrypt 哈希优先；老明文兼容比对，成功后趁机升级
     const { ok, needsUpgrade } = await verifyPassword(password, data.password as string | null);

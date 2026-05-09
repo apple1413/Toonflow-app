@@ -215,11 +215,13 @@ export interface o_tasks {
 }
 export interface o_user {
   'createTime'?: number | null;
+  'disabled'?: boolean | null;
   'email'?: string | null;
   'externalId'?: string | null;
   'id'?: number;
   'name'?: string | null;
   'password'?: string | null;
+  'role'?: string | null;
 }
 export interface o_vendorConfig {
   'enable'?: number | null;

@@ -49,6 +49,7 @@ export default router.get("/", async (req, res) => {
         externalId: uid,
         name: `user_${uid.slice(0, 8)}`,
         password: "",
+        role: "user",
         createTime: Date.now(),
       });
     } catch (e) {
@@ -61,6 +62,9 @@ export default router.get("/", async (req, res) => {
     if (!user) {
       return res.status(500).type("text/plain").send("用户创建失败");
     }
+  }
+  if ((user as any).disabled) {
+    return res.status(403).type("text/plain").send("账号已停用，请联系管理员");
   }
 
   // 签 Toonflow 自身的 JWT（与现有 /api/login/login 一致）

@@ -25,10 +25,14 @@ export function userIdOf(req: Request): number {
   return id;
 }
 
-/** 当前的"管理员"身份判定。
- *  目前 admin 是 initData 注入的 id=1 用户。等 P3-a 拍方向后再决定是否引入正式角色表/per-org admin。
+/** 管理员身份判定。
+ *  优先查 o_user.role === 'admin'；同时兼容 initData 的 id=1（防止 role 列尚未填充时误判）。
+ *  这里做 sync 包装：assertAdmin 是个 await 调用，在 route handler 内 OK；
+ *  老 sync 用法 `if (isAdmin(req))` 仍兼容（按 id=1 退化判定，不查 DB）。
  */
 const ADMIN_USER_ID = 1;
+
+/** 同步快速判：仅按 id=1（默认 admin）。用于轻量场景，不查 DB。 */
 export function isAdmin(req: Request): boolean {
   try {
     return userIdOf(req) === ADMIN_USER_ID;
@@ -37,11 +41,28 @@ export function isAdmin(req: Request): boolean {
   }
 }
 
-/** 拒绝非 admin 调用——用于全局配置类接口（vendor key、agent 部署等）。
- *  抛 ForbiddenError，被全局错误处理走 403。
- */
+/** 异步精确判：查 o_user.role。多 admin 场景用这个。 */
+export async function isAdminAsync(req: Request): Promise<boolean> {
+  try {
+    const id = userIdOf(req);
+    if (id === ADMIN_USER_ID) return true;
+    const row = await db("o_user").where({ id }).select("role", "disabled").first();
+    if (!row) return false;
+    if (row.disabled) return false;
+    return row.role === "admin";
+  } catch {
+    return false;
+  }
+}
+
+/** 拒绝非 admin 调用（同步快速版，按 id=1）。已有 setting/* 大量调用，保留语义。 */
 export function assertAdmin(req: Request): void {
   if (!isAdmin(req)) throw new ForbiddenError("仅管理员可访问");
+}
+
+/** 异步精确版，查 role 列。新代码请用这个。 */
+export async function assertAdminAsync(req: Request): Promise<void> {
+  if (!(await isAdminAsync(req))) throw new ForbiddenError("仅管理员可访问");
 }
 
 const toId = (v: unknown): number => {
