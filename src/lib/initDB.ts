@@ -280,8 +280,10 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
       builder: (table) => {
         table.text("key");
         table.text("value");
-        table.primary(["key"]);
-        table.unique(["key"]);
+        table.bigInteger("userId"); // NULL = 全局默认（如 tokenKey、modelOnnxFile 等系统级）
+        // PK 改为复合：每个用户每个 key 一行；NULL userId 的全局默认行用 partial unique index 保唯一
+        table.unique(["userId", "key"]);
+        table.index(["key"]);
       },
       initData: async (knex) => {
         await knex("o_setting").insert([
@@ -1065,6 +1067,11 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_skillList", col: "userId", add: (t) => t.bigInteger("userId") },
     { table: "memories", col: "userId", add: (t) => t.bigInteger("userId") },
     { table: "o_imageFlow", col: "userId", add: (t) => t.bigInteger("userId") },
+    // P3-a per-user setting：fall-through 读（user 优先，缺则回退 admin id=1）；写永远写当前用户行
+    { table: "o_agentDeploy", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "o_prompt", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "o_modelPrompt", col: "userId", add: (t) => t.bigInteger("userId") },
+    { table: "o_setting", col: "userId", add: (t) => t.bigInteger("userId") }, // tokenKey 这种系统级 key 留 NULL
   ];
   for (const p of columnPatches) {
     if (!(await knex.schema.hasTable(p.table))) continue;
@@ -1084,6 +1091,14 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { sql: `CREATE INDEX IF NOT EXISTS o_skillList_userId_idx ON "o_skillList"("userId")`, desc: "o_skillList.userId 索引" },
     { sql: `CREATE INDEX IF NOT EXISTS memories_userId_isolationKey_idx ON memories("userId", "isolationKey")`, desc: "memories.userId+isolationKey 索引" },
     { sql: `CREATE INDEX IF NOT EXISTS o_imageFlow_userId_idx ON "o_imageFlow"("userId")`, desc: "o_imageFlow.userId 索引" },
+    { sql: `CREATE INDEX IF NOT EXISTS o_agentDeploy_userId_key_idx ON "o_agentDeploy"("userId","key")`, desc: "o_agentDeploy.userId+key 索引（fall-through 查询）" },
+    { sql: `CREATE INDEX IF NOT EXISTS o_prompt_userId_type_idx ON "o_prompt"("userId","type")`, desc: "o_prompt.userId+type 索引" },
+    { sql: `CREATE INDEX IF NOT EXISTS o_modelPrompt_userId_idx ON "o_modelPrompt"("userId","vendorId","model")`, desc: "o_modelPrompt 复合索引" },
+    // o_setting 改为 per-user：把原本仅在 key 上的 PK/UNIQUE 改成 (userId, key) 复合 + NULL 单独唯一
+    { sql: `ALTER TABLE "o_setting" DROP CONSTRAINT IF EXISTS o_setting_pkey`, desc: "o_setting 移除老 PK(key)" },
+    { sql: `ALTER TABLE "o_setting" DROP CONSTRAINT IF EXISTS o_setting_key_unique`, desc: "o_setting 移除老 unique(key)" },
+    { sql: `CREATE UNIQUE INDEX IF NOT EXISTS o_setting_user_key_uniq ON "o_setting"("userId","key")`, desc: "o_setting (userId,key) 唯一" },
+    { sql: `CREATE UNIQUE INDEX IF NOT EXISTS o_setting_global_key_uniq ON "o_setting"("key") WHERE "userId" IS NULL`, desc: "o_setting NULL 用户的 key 唯一（全局默认）" },
   ];
   for (const p of indexPatches) {
     try {
@@ -1100,6 +1115,12 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_skillList", col: "userId" }, // 老库里的技能默认归 admin
     { table: "memories", col: "userId" },
     { table: "o_imageFlow", col: "userId" }, // 老 flow 没有归属概念，默认归 admin
+    // per-user setting 表的 seed 数据归 admin，作为新用户的 fall-through 默认
+    { table: "o_agentDeploy", col: "userId" },
+    { table: "o_prompt", col: "userId" },
+    { table: "o_modelPrompt", col: "userId" },
+    // 注意：o_setting 不全量回填——tokenKey / switchAiDevTool 等系统级配置应保持 userId=NULL
+    // 让它们对所有用户透明可见（fall-through 时 NULL 视同 admin 的全局默认）
   ];
   for (const t of backfillTargets) {
     try {

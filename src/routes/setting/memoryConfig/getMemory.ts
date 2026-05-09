@@ -1,21 +1,30 @@
 import express from "express";
 import { error, success } from "@/lib/responseFormat";
 import u from "@/utils";
+import { userIdOf } from "@/utils/ownership";
+import { fallthroughList } from "@/utils/perUserSetting";
 const router = express.Router();
 
+const MEMORY_KEYS = [
+  "messagesPerSummary",
+  "shortTermLimit",
+  "summaryMaxLength",
+  "summaryLimit",
+  "ragLimit",
+  "deepRetrieveSummaryLimit",
+  "modelOnnxFile",
+  "modelDtype",
+] as const;
+
 export default router.get("/", async (req, res) => {
-  const settingData = await u
-    .db("o_setting")
-    .whereIn("key", [
-      "messagesPerSummary",
-      "shortTermLimit",
-      "summaryMaxLength",
-      "summaryLimit",
-      "ragLimit",
-      "deepRetrieveSummaryLimit",
-      "modelOnnxFile",
-      "modelDtype",
-    ]);
+  const userId = userIdOf(req);
+  // 用户优先 + admin (id=1) 默认 + NULL（系统默认，如 modelOnnxFile）兜底；按 key 去重
+  const settingData = await fallthroughList<any>(
+    "o_setting",
+    userId,
+    "key",
+    (q) => q.whereIn("key", MEMORY_KEYS as any),
+  );
 
   if (!settingData) return res.status(400).send(error(`获取记忆配置失败`));
   const memoryObj: Record<string, number | string | string[]> = {};

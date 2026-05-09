@@ -26,6 +26,7 @@ export interface o_agentDeploy {
   'temperature'?: number | null;
   'topP'?: number | null;
   'type'?: string | null;
+  'userId'?: number | null;
   'vendorId'?: string | null;
 }
 export interface o_agentWorkData {
@@ -99,6 +100,7 @@ export interface o_modelPrompt {
   'id'?: number;
   'model'?: string | null;
   'prompt'?: string | null;
+  'userId'?: number | null;
   'vendorId'?: string | null;
 }
 export interface o_novel {
@@ -146,6 +148,7 @@ export interface o_prompt {
   'name'?: string | null;
   'type'?: string | null;
   'useData'?: string | null;
+  'userId'?: number | null;
 }
 export interface o_script {
   'content'?: string | null;
@@ -162,6 +165,7 @@ export interface o_scriptAssets {
 }
 export interface o_setting {
   'key'?: string | null;
+  'userId'?: number | null;
   'value'?: string | null;
 }
 export interface o_skillAttribution {
