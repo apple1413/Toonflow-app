@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 import u from "@/utils";
 import { setToken } from "./login";
 import { getTokenKey } from "@/utils/tokenKey";
@@ -9,6 +10,26 @@ const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const pickStr = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
+// HMAC 签名校验：外部主站调 SSO 时传 uid + ts + sig（hex(hmac-sha256(secret, `${uid}|${ts}`))）
+// 仅当 SSO_SHARED_SECRET env 已配置时启用强校验；否则走旧"相信前端 uid"行为并 warn
+const SSO_TS_TOLERANCE_SEC = 5 * 60; // 5 分钟时间窗
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
+function verifySsoSignature(uid: string, ts: string, sig: string, secret: string): boolean {
+  const tsNum = Number(ts);
+  if (!Number.isFinite(tsNum)) return false;
+  const skewSec = Math.abs(Date.now() / 1000 - tsNum);
+  if (skewSec > SSO_TS_TOLERANCE_SEC) return false;
+  const expected = crypto.createHmac("sha256", secret).update(`${uid}|${ts}`).digest("hex");
+  return timingSafeEqualHex(expected, sig.toLowerCase());
+}
 
 // 仅允许同源相对路径，拒绝 //host、/\host、协议绝对地址等
 const sanitizeRedirect = (raw: string | undefined): string => {
@@ -29,14 +50,32 @@ const jsonForScript = (v: unknown): string => {
 };
 
 // SSO 入站：外部主站把当前用户 UUID 直接拼到链接里发起跳转
-// GET /api/login/sso?uid=<uuid>&redirect=
+// GET /api/login/sso?uid=<uuid>&ts=<unix_seconds>&sig=<hmac-hex>&redirect=
+//
+// 强校验：env SSO_SHARED_SECRET 设置后，必须带 ts + sig（hmac-sha256(secret, `${uid}|${ts}`)），
+// 时间窗 5 分钟。
+// 兼容模式：env 未设置时走旧"相信前端 uid"流程，但每次请求会 warn 一次（生产请配 env）。
 export default router.get("/", async (req, res) => {
   const q = req.query as Record<string, unknown>;
   const uid = pickStr(q.uid);
+  const ts = pickStr(q.ts);
+  const sig = pickStr(q.sig);
   const redirect = sanitizeRedirect(pickStr(q.redirect));
 
   if (!uid || !UUID_RE.test(uid)) {
     return res.status(400).type("text/plain").send("uid 非法");
+  }
+
+  const sharedSecret = process.env.SSO_SHARED_SECRET;
+  if (sharedSecret && sharedSecret.trim()) {
+    if (!ts || !sig) {
+      return res.status(400).type("text/plain").send("缺少 ts/sig 签名参数");
+    }
+    if (!verifySsoSignature(uid, ts, sig, sharedSecret)) {
+      return res.status(401).type("text/plain").send("SSO 签名无效或已过期");
+    }
+  } else {
+    console.warn("[SSO] SSO_SHARED_SECRET 未配置——任何持有 uid 的请求都能登录该用户。生产环境请务必配置该 env");
   }
 
   // 找/建本地用户（兼容并发：插入冲突时回查同 externalId）
