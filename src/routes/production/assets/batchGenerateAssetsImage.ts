@@ -6,6 +6,7 @@ import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { Output } from "ai";
 import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsAssets } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 export default router.post(
@@ -59,7 +60,7 @@ export default router.post(
     // 先批量为所有 assets 创建 image 记录并标记为"生成中"
     const imageIdMap: Record<number, number> = {};
     for (const item of assetsDataArr) {
-      const [imageId] = await u.db("o_image").insert({
+      const imageId = await insertReturnId("o_image", {
         assetsId: item.id,
         type: item.type,
         state: "生成中",

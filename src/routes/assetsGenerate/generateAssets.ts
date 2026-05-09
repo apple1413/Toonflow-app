@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 
 const router = express.Router();
 
@@ -86,7 +87,7 @@ export default router.post("/", validateFields(requestSchema), async (req, res) 
   if (!cfg) return res.status(400).send(error("不支持的类型"));
 
   // 2. 创建图片占位记录
-  const [imageId] = await u.db("o_image").insert({
+  const imageId = await insertReturnId("o_image", {
     type,
     state: "生成中",
     assetsId: id,

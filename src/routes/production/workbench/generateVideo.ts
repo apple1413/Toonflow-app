@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from "uuid";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsVideoTrack } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 type Type = "imageReference" | "startImage" | "endImage" | "videoReference" | "audioReference";
@@ -79,7 +80,7 @@ export default router.post(
       }),
     );
     //新增
-    const [videoId] = await u.db("o_video").insert({
+    const videoId = await insertReturnId("o_video", {
       filePath: videoPath,
       time: Date.now(),
       state: "生成中",

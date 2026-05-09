@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsAssets } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 // 新增剧本
@@ -20,7 +21,7 @@ export default router.post(
     const userId = userIdOf(req);
     await assertOwnsProject(userId, projectId);
     if (assets.length) await assertOwnsAssets(userId, assets);
-    const [scriptId] = await u.db("o_script").insert({
+    const scriptId = await insertReturnId("o_script", {
       name,
       content,
       projectId,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import _ from "lodash";
 import ResTool from "@/socket/resTool";
 import u from "@/utils";
+import { insertReturnId } from "@/utils/insertReturnId";
 
 const deriveAssetSchema = z.object({
   id: z.number().describe("衍生资产ID,如果新增则为空"),
@@ -115,7 +116,7 @@ export default (toolCpnfig: ToolConfig) => {
           await u.db("o_assets").where("id", deriveAsset.id).update(data);
           thinking.appendText(`已更新衍生资产，ID: ${deriveAsset.id}\n`);
         } else {
-          const [insertedId] = await u.db("o_assets").insert(data);
+          const insertedId = await insertReturnId("o_assets", data);
           data.id = insertedId;
           await u.db("o_scriptAssets").insert({ scriptId, assetId: insertedId });
           thinking.appendText(`已新增衍生资产，ID: ${insertedId}\n`);

@@ -101,7 +101,8 @@ export default router.post(
     if ((vendor.id as string).includes(":")) return res.status(400).send(error("id不能包含英文冒号"));
     const data = await u.db("o_vendorConfig").where("id", vendor.id).first();
     if (data) return res.status(500).send(error("供应商id已存在"));
-    const [id] = await u.db("o_vendorConfig").insert({
+    // o_vendorConfig.id 是用户指定的字符串主键，无需取自增 id；返回值未被使用
+    await u.db("o_vendorConfig").insert({
       id: vendor.id,
       inputValues: JSON.stringify(vendor.inputValues ?? {}),
       models: JSON.stringify([]),

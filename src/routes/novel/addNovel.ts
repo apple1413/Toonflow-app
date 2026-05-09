@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 // 新增原文数据
@@ -30,7 +31,7 @@ export default router.post(
       lastChapterIndex = getLastChapterIndex.chapterIndex!;
     }
     for (const item of data) {
-      const [id] = await u.db("o_novel").insert({
+      const id = await insertReturnId("o_novel", {
         projectId,
         chapterIndex: ++lastChapterIndex,
         reel: item.reel,

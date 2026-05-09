@@ -5,6 +5,7 @@ import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
 import { v4 as uuid } from "uuid";
 import { userIdOf, assertOwnsProject } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 // 根据 base64 头部获取文件扩展名
@@ -42,13 +43,13 @@ export default router.post(
     const savePath = `/${projectId}/assets/${uuid()}.${ext}`;
 
     await u.oss.writeFile(savePath, Buffer.from(base64Data.match(/base64,([A-Za-z0-9+/=]+)/)[1] ?? "", "base64"));
-    const [id] = await u.db("o_assets").insert({
+    const id = await insertReturnId("o_assets", {
       type: type,
       projectId: projectId,
       name,
       startTime: Date.now(),
     });
-    const [imageId] = await u.db("o_image").insert({
+    const imageId = await insertReturnId("o_image", {
       filePath: savePath,
       type,
       assetsId: id,

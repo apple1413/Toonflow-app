@@ -1,4 +1,5 @@
 import db from "@/utils/db";
+import { insertReturnId } from "@/utils/insertReturnId";
 
 const taskStateMap = {
   "0": "进行中",
@@ -38,7 +39,7 @@ export default async function taskRecord(
     }
   }
 
-  const [id] = await db("o_tasks").insert({
+  const id = await insertReturnId("o_tasks", {
     projectId,
     taskClass,
     relatedObjects: opteorContent,

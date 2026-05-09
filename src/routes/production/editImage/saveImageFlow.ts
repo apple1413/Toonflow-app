@@ -4,6 +4,7 @@ import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 export default router.post(
@@ -27,12 +28,10 @@ export default router.post(
         });
       }
     });
-    // PG 默认 insert 不返回 lastInsertId，必须用 .returning('id') 显式拿；better-sqlite3 也支持
-    const [row] = await u.db("o_imageFlow").insert({
+    const insertFlowId = await insertReturnId("o_imageFlow", {
       flowData: JSON.stringify({ edges, nodes }),
       userId,
-    }).returning("id");
-    const insertFlowId = typeof row === "object" ? (row as any).id : row;
+    });
     return res.status(200).send(success({ id: insertFlowId }));
   },
 );

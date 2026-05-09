@@ -6,6 +6,7 @@ import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { stat } from "original-fs";
 import { userIdOf, assertOwnsProject, assertOwnsAsset } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 
 // 保存资产图片
@@ -33,7 +34,7 @@ export default router.post(
       // 写入文件
       await u.oss.writeFile(savePath, Buffer.from(realBase64, "base64"));
       // 插入图片表
-      const [idData] = await u.db("o_image").insert({
+      const idData = await insertReturnId("o_image", {
         assetsId: id,
         filePath: savePath,
         type: type,

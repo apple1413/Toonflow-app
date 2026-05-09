@@ -4,6 +4,7 @@ import { z } from "zod";
 import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
+import { insertReturnId } from "@/utils/insertReturnId";
 const router = express.Router();
 interface Storyboard {
   id: number;
@@ -36,7 +37,7 @@ export default router.post(
       scriptId: scriptId,
       projectId,
     });
-    const [id] = await u.db("o_storyboard").insert({
+    const id = await insertReturnId("o_storyboard", {
       prompt,
       duration,
       state,
