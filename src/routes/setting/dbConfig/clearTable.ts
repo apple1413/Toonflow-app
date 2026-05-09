@@ -1,11 +1,13 @@
 import express from "express";
 import { success, error } from "@/lib/responseFormat";
 import { db } from "@/utils/db";
+import { assertAdmin } from "@/utils/ownership";
 
 const router = express.Router();
 
 export default router.post("/", async (req, res) => {
   try {
+    assertAdmin(req);
     const { tableName } = req.body;
     if (!tableName || typeof tableName !== "string") {
       return res.status(400).send(error("请提供有效的表名"));

@@ -2,11 +2,15 @@ import express from "express";
 import { success, error } from "@/lib/responseFormat";
 import { db } from "@/utils/db";
 import initDB from "@/lib/initDB";
+import { assertAdmin } from "@/utils/ownership";
 
 const router = express.Router();
 
+// 整库导入（DROP 所有表 → 重建 → 灌数据）。仅 admin。SaaS 上调用会被
+// initDB 的 forceInit 护栏 + sqlite_master 语法双保险拦下。
 export default router.post("/", async (req, res) => {
   try {
+    assertAdmin(req);
     const { tables: importTables } = req.body;
     if (!importTables || typeof importTables !== "object") {
       return res.status(400).send(error("无效的导入数据格式"));

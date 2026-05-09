@@ -4,6 +4,7 @@ import { validateFields } from "@/middleware/middleware";
 import u from "@/utils";
 import { z } from "zod";
 import { transform } from "sucrase";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -13,6 +14,7 @@ export default router.post(
     inputValues: z.record(z.string(), z.string()),
   }),
   async (req, res) => {
+    assertAdmin(req);
     const { id, inputValues } = req.body;
 
     await u

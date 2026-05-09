@@ -3,6 +3,7 @@ import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import u from "@/utils";
 import { z } from "zod";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 
 export default router.post(
@@ -43,6 +44,7 @@ export default router.post(
     ]),
   }),
   async (req, res) => {
+    assertAdmin(req);
     const { id, model } = req.body;
 
     const models = await u.db("o_vendorConfig").where("id", id).first("models");

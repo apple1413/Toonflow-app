@@ -4,6 +4,7 @@ import { validateFields } from "@/middleware/middleware";
 import u from "@/utils";
 import { z } from "zod";
 import { transform } from "sucrase";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 
 const vendorConfigSchema = z.object({
@@ -64,6 +65,7 @@ export default router.post(
     tsCode: z.string(),
   }),
   async (req, res) => {
+    assertAdmin(req);
     const { tsCode } = req.body;
     const jsCode = transform(tsCode, { transforms: ["typescript"] }).code;
     const exports = u.vm(jsCode);

@@ -2,11 +2,15 @@ import express from "express";
 import { success, error } from "@/lib/responseFormat";
 import { db } from "@/utils/db";
 import initDB from "@/lib/initDB";
+import { assertAdmin } from "@/utils/ownership";
 
 const router = express.Router();
 
+// 整库清空 + 重建。仅 admin。实现用 SQLite 专属语法（sqlite_master/PRAGMA），
+// 即便误调到 PG 也会自然 SQL error，多一道保险
 export default router.get("/", async (req, res) => {
   try {
+    assertAdmin(req);
     // 获取所有表名
     const tables: { name: string }[] = await db.raw(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%'`,

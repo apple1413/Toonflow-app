@@ -1,9 +1,13 @@
 import express from "express";
 import { success } from "@/lib/responseFormat";
 import u from "@/utils";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 
+// 直接回显 inputValues（含 API key 等敏感字段），仅 admin 可见。
+// 等 P3-a 拍方向后若改为 vendor per-user，再按当前用户过滤
 export default router.post("/", async (req, res) => {
+  assertAdmin(req);
   const data = await u.db("o_vendorConfig").select("*");
 
   const list = (

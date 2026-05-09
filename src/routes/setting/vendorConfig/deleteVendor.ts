@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import u from "@/utils";
 import { z } from "zod";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 export default router.post(
   "/",
@@ -12,6 +13,7 @@ export default router.post(
     id: z.string(),
   }),
   async (req, res) => {
+    assertAdmin(req);
     const { id } = req.body;
     await u.db("o_vendorConfig").where("id", id).del();
     await u.db("o_agentDeploy").where("vendorId", id).update({

@@ -25,6 +25,25 @@ export function userIdOf(req: Request): number {
   return id;
 }
 
+/** 当前的"管理员"身份判定。
+ *  目前 admin 是 initData 注入的 id=1 用户。等 P3-a 拍方向后再决定是否引入正式角色表/per-org admin。
+ */
+const ADMIN_USER_ID = 1;
+export function isAdmin(req: Request): boolean {
+  try {
+    return userIdOf(req) === ADMIN_USER_ID;
+  } catch {
+    return false;
+  }
+}
+
+/** 拒绝非 admin 调用——用于全局配置类接口（vendor key、agent 部署等）。
+ *  抛 ForbiddenError，被全局错误处理走 403。
+ */
+export function assertAdmin(req: Request): void {
+  if (!isAdmin(req)) throw new ForbiddenError("仅管理员可访问");
+}
+
 const toId = (v: unknown): number => {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) throw new ForbiddenError("ID 非法");

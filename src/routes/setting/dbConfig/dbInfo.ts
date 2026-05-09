@@ -1,11 +1,13 @@
 import express from "express";
 import { success, error } from "@/lib/responseFormat";
 import { db } from "@/utils/db";
+import { assertAdmin } from "@/utils/ownership";
 
 const router = express.Router();
 
 export default router.get("/", async (req, res) => {
   try {
+    assertAdmin(req);
     const tables: { name: string }[] = await db.raw(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%'`,
     );

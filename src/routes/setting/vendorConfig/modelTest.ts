@@ -4,6 +4,7 @@ import { validateFields } from "@/middleware/middleware";
 import u from "@/utils";
 import { z } from "zod";
 import { tool } from "ai";
+import { assertAdmin } from "@/utils/ownership";
 const router = express.Router();
 
 // 检查语言模型
@@ -15,6 +16,7 @@ export default router.post(
     id: z.string(),
   }),
   async (req, res) => {
+    assertAdmin(req);
     const { modelName, type, id } = req.body;
 
     try {
