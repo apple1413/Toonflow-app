@@ -1,6 +1,7 @@
 import express from "express";
 import u from "@/utils";
 import { setToken } from "./login";
+import { getTokenKey } from "@/utils/tokenKey";
 
 const router = express.Router();
 
@@ -63,11 +64,13 @@ export default router.get("/", async (req, res) => {
   }
 
   // 签 Toonflow 自身的 JWT（与现有 /api/login/login 一致）
-  const tokenData = await u.db("o_setting").where("key", "tokenKey").first();
-  if (!tokenData) {
+  let tokenKey: string;
+  try {
+    tokenKey = await getTokenKey();
+  } catch {
     return res.status(500).type("text/plain").send("服务器秘钥未配置");
   }
-  const token = "Bearer " + setToken({ id: user.id, name: user.name }, "180Days", tokenData.value as string);
+  const token = "Bearer " + setToken({ id: user.id, name: user.name }, "180Days", tokenKey);
 
   // 返回小 HTML：把 token 写入 localStorage 后跳首页（前端读 localStorage.token）
   const html = `<!doctype html>

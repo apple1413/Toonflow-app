@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { z } from "zod";
+import { getTokenKey } from "@/utils/tokenKey";
 const router = express.Router();
 
 export function setToken(payload: string | object, expiresIn: string | number, secret: string): string {
@@ -27,15 +28,19 @@ export default router.post(
     if (!data) return res.status(400).send(error("登录失败"));
 
     if (data!.password == password && data!.name == username) {
-      const tokenData = await u.db("o_setting").where("key", "tokenKey").first();
-      if (!tokenData) return res.status(400).send(error("未找到tokenKey"));
+      let tokenKey: string;
+      try {
+        tokenKey = await getTokenKey();
+      } catch {
+        return res.status(400).send(error("未找到tokenKey"));
+      }
       const token = setToken(
         {
           id: data!.id,
           name: data!.name,
         },
         "180Days",
-        tokenData?.value as string,
+        tokenKey,
       );
 
       return res.status(200).send(success({ token: "Bearer " + token, name: data!.name, id: data!.id }, "登录成功"));

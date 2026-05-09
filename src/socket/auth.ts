@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { Socket } from "socket.io";
 import u from "@/utils";
 import { assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
+import { getTokenKey } from "@/utils/tokenKey";
 
 interface JwtPayload {
   id: number | string;
@@ -13,9 +14,12 @@ interface JwtPayload {
  */
 export async function verifySocketToken(rawToken: unknown): Promise<number | null> {
   if (typeof rawToken !== "string" || !rawToken) return null;
-  const setting = await u.db("o_setting").where("key", "tokenKey").select("value").first();
-  if (!setting) return null;
-  const tokenKey = setting.value as string;
+  let tokenKey: string;
+  try {
+    tokenKey = await getTokenKey();
+  } catch {
+    return null;
+  }
   const token = rawToken.replace("Bearer ", "");
   try {
     const decoded = jwt.verify(token, tokenKey) as JwtPayload;
