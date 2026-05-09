@@ -1,42 +1,26 @@
-import jwt from "jsonwebtoken";
 import u from "@/utils";
 import { Namespace, Socket } from "socket.io";
 import * as agent from "@/agents/scriptAgent/index";
 import ResTool from "@/socket/resTool";
-
-async function verifyToken(rawToken: string): Promise<Boolean> {
-  const setting = await u.db("o_setting").where("key", "tokenKey").select("value").first();
-  if (!setting) return false;
-  const { value: tokenKey } = setting;
-  if (!rawToken) return false;
-  const token = rawToken.replace("Bearer ", "");
-  try {
-    jwt.verify(token, tokenKey as string);
-    return true;
-  } catch (err) {
-    return false;
-  }
-}
+import { authSocketAgentContext } from "@/socket/auth";
 
 export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
-    const token = socket.handshake.auth.token;
-    if (!token || !(await verifyToken(token))) {
-      console.log("[scriptAgent] 连接失败，token无效");
-      socket.disconnect();
-      return;
-    }
-    const isolationKey = socket.handshake.auth.isolationKey;
-    if (!isolationKey) {
-      console.log("[scriptAgent] 连接失败，缺少 isolationKey");
-      socket.disconnect();
-      return;
-    }
+    const auth = socket.handshake.auth;
+    // scriptAgent 只用 projectId，没有 scriptId
+    const userId = await authSocketAgentContext(
+      socket,
+      { projectId: auth.projectId, isolationKey: auth.isolationKey },
+      "scriptAgent",
+    );
+    if (userId == null) return;
 
-    console.log("[scriptAgent] 已连接:", socket.id);
+    const isolationKey: string = auth.isolationKey;
+
+    console.log("[scriptAgent] 已连接:", socket.id, "user:", userId);
 
     const resTool = new ResTool(socket, {
-      projectId: socket.handshake.auth.projectId,
+      projectId: auth.projectId,
     });
     let abortController: AbortController | null = null;
 

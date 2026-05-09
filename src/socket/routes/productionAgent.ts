@@ -1,43 +1,27 @@
-import jwt from "jsonwebtoken";
 import u from "@/utils";
 import { Namespace, Socket } from "socket.io";
 import * as agent from "@/agents/productionAgent/index";
 import ResTool from "@/socket/resTool";
-
-async function verifyToken(rawToken: string): Promise<Boolean> {
-  const setting = await u.db("o_setting").where("key", "tokenKey").select("value").first();
-  if (!setting) return false;
-  const { value: tokenKey } = setting;
-  if (!rawToken) return false;
-  const token = rawToken.replace("Bearer ", "");
-  try {
-    jwt.verify(token, tokenKey as string);
-    return true;
-  } catch (err) {
-    return false;
-  }
-}
+import { authSocketAgentContext } from "@/socket/auth";
+import { assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
 
 export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
-    const token = socket.handshake.auth.token;
-    if (!token || !(await verifyToken(token))) {
-      console.log("[productionAgent] 连接失败，token无效");
-      socket.disconnect();
-      return;
-    }
-    let isolationKey = socket.handshake.auth.isolationKey;
-    if (!isolationKey) {
-      console.log("[productionAgent] 连接失败，缺少 isolationKey");
-      socket.disconnect();
-      return;
-    }
+    const auth = socket.handshake.auth;
+    const userId = await authSocketAgentContext(
+      socket,
+      { projectId: auth.projectId, scriptId: auth.scriptId, isolationKey: auth.isolationKey },
+      "productionAgent",
+    );
+    if (userId == null) return;
 
-    console.log("[productionAgent] 已连接:", socket.id);
+    let isolationKey: string = auth.isolationKey;
+
+    console.log("[productionAgent] 已连接:", socket.id, "user:", userId);
 
     let resTool = new ResTool(socket, {
-      projectId: socket.handshake.auth.projectId,
-      scriptId: socket.handshake.auth.scriptId,
+      projectId: auth.projectId,
+      scriptId: auth.scriptId,
     });
     let abortController: AbortController | null = null;
 
@@ -46,7 +30,19 @@ export default (nsp: Namespace) => {
       thinlLevel: 0,
     };
 
-    socket.on("updateContext", (data: { isolationKey: string; projectId: number; scriptId: number }, callback) => {
+    socket.on("updateContext", async (data: { isolationKey: string; projectId: number; scriptId: number }, callback) => {
+      // 切换上下文同样要重做归属校验，否则连接建立后可改成他人项目
+      try {
+        await assertOwnsProject(userId, data.projectId);
+        if (data.scriptId != null) await assertOwnsScript(userId, data.scriptId);
+        if (typeof data.isolationKey !== "string" || !data.isolationKey.startsWith(`${data.projectId}:`)) {
+          throw new Error("isolationKey 与 projectId 不匹配");
+        }
+      } catch (e: any) {
+        console.log("[productionAgent] updateContext 拒绝:", e?.message);
+        callback?.({ success: false, message: e?.message ?? "无权切换该上下文" });
+        return;
+      }
       isolationKey = data.isolationKey;
       resTool = new ResTool(socket, {
         projectId: data.projectId,
