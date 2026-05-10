@@ -2,10 +2,11 @@ import express from "express";
 import u from "@/utils";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { success } from "@/lib/responseFormat";
+import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsVideoTrack } from "@/utils/ownership";
 import { insertReturnId } from "@/utils/insertReturnId";
+import { chargeCredits, InsufficientCreditsError } from "@/utils/credits";
 const router = express.Router();
 
 type Type = "imageReference" | "startImage" | "endImage" | "videoReference" | "audioReference";
@@ -44,6 +45,24 @@ export default router.post(
     await assertOwnsProject(userId, projectId);
     await assertOwnsScript(userId, scriptId);
     await assertOwnsVideoTrack(userId, trackId);
+
+    // 扣积分（场景：video_generation）。env 未配置 / admin form-login 用户跳过；余额不足 402
+    const userRow = await u.db("o_user").where({ id: userId }).select("externalId").first();
+    const taskId = `toonflow:video:${trackId}:${Date.now()}`;
+    try {
+      await chargeCredits({
+        userExternalId: (userRow?.externalId as string) ?? "",
+        scene: "video_generation",
+        taskId,
+      });
+    } catch (e: any) {
+      if (e instanceof InsufficientCreditsError) {
+        return res.status(402).send(error(`积分不足：本次需要 ${e.required}，剩余 ${e.remaining}`));
+      }
+      console.error("[generateVideo] charge 失败", e);
+      return res.status(500).send(error("扣费失败，请稍后重试"));
+    }
+
     let modeData = [];
     if (Array.isArray(mode)) {
     } else if (typeof mode === "string" && mode.startsWith('["') && mode.endsWith('"]')) {

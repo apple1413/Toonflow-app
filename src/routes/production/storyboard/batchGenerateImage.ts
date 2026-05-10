@@ -7,6 +7,7 @@ import { validateFields } from "@/middleware/middleware";
 import { Output, tool } from "ai";
 import { assetItemSchema } from "@/agents/productionAgent/tools";
 import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsStoryboards } from "@/utils/ownership";
+import { chargeCredits, InsufficientCreditsError } from "@/utils/credits";
 const router = express.Router();
 export type AssetData = z.infer<typeof assetItemSchema>;
 
@@ -35,6 +36,27 @@ export default router.post(
     await assertOwnsProject(userId, projectId);
     await assertOwnsScript(userId, scriptId);
     await assertOwnsStoryboards(userId, storyboardIds);
+
+    // 批量扣积分：每个分镜按 image_generation 算一次
+    // shouldGenerateImage===0 的分镜不实际生成图，但为了简化先按数量统一扣（后续如果差距大再优化）
+    const userRow = await u.db("o_user").where({ id: userId }).select("externalId").first();
+    const externalId = (userRow?.externalId as string) ?? "";
+    if (externalId) {
+      try {
+        await chargeCredits({
+          userExternalId: externalId,
+          scene: "image_generation",
+          taskId: `toonflow:storyboard-batch:${scriptId}:${storyboardIds.join(",")}`,
+        });
+      } catch (e: any) {
+        if (e instanceof InsufficientCreditsError) {
+          return res.status(402).send(error(`积分不足：本次需要 ${e.required}，剩余 ${e.remaining}`));
+        }
+        console.error("[batchGenerateImage] charge 失败", e);
+        return res.status(500).send(error("扣费失败，请稍后重试"));
+      }
+    }
+
     // 当没有 storyboardIds 时，通过 AI 生成新的分镜面板数据
     let finalStoryboardIds: number[] = storyboardIds || [];
     // shouldGenerateImage === 0 的分镜标记为「未生成」，其余标记为「生成中」
