@@ -28,11 +28,20 @@ if (useCloudDb) {
     connection: {
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false }, // Supabase 强制 SSL，证书链由托管侧管理
+      // 让 pg socket 开 TCP keep-alive，闲置时定期发心跳，避开 Supabase pooler 静默回收闲连
+      // 这是根治 "Connection terminated unexpectedly" 间歇报错的方法
+      keepAlive: true,
     },
     // 把 Toonflow 表隔离到独立 schema，避免与库里其他产品表名冲突
     // 第二项 public 用于读取共享对象（如 extension）；写入永远落到第一项 toonflow
     searchPath: ["toonflow", "public"],
-    pool: { min: 0, max: 10 },
+    pool: {
+      min: 0,
+      max: 10,
+      // 闲置 30s 主动销毁连接，让下次请求建新的，避开 pooler 端可能的提前 close
+      idleTimeoutMillis: 30_000,
+    },
+    acquireConnectionTimeout: 10_000,
   });
 } else {
   const dbPath = getPath("db2.sqlite");
