@@ -110,6 +110,10 @@ export default async function startServe(randomPort: Boolean = false) {
 
   const { getTokenKey } = await import("@/utils/tokenKey");
   app.use(async (req, res, next) => {
+    // 只拦 /api/* 路径——SPA 路由（/login、/project 等）和静态资源不应被 JWT 中间件 401。
+    // 静态资源已被前面的 express.static 处理；剩余非 API 的路径走 SPA fallback（最末尾）
+    if (!req.path.startsWith("/api/")) return next();
+
     let tokenKey: string;
     try {
       tokenKey = await getTokenKey();
@@ -135,6 +139,14 @@ export default async function startServe(randomPort: Boolean = false) {
 
   const router = await import("@/router");
   await router.default(app);
+
+  // SPA fallback：所有非 /api/* 且未匹配静态文件的 GET 请求都吐 index.html，
+  // 让 vue-router 接管前端路由。这样直接刷新 /login、/project/123 等都能正常工作
+  app.get(/^(?!\/api\/).*/, (req, res, next) => {
+    const indexPath = path.join(webDir, "index.html");
+    if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
+    next();
+  });
 
   // 404 处理
   app.use((_, res, next: NextFunction) => {
