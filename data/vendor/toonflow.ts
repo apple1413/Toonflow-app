@@ -337,10 +337,7 @@ const videoRequest = async (config: VideoConfig, model: VideoModel): Promise<str
 
   if (lowerName.includes("wan")) {
     // 万象系列
-    if (
-      (activeMode === "startEndRequired" || activeMode === "endFrameOptional" || activeMode === "startFrameOptional") &&
-      imageRefs.length >= 2
-    ) {
+    if ((activeMode === "startEndRequired" || activeMode === "endFrameOptional" || activeMode === "startFrameOptional") && imageRefs.length >= 2) {
       if (imageRefs[0]) metadata.first_frame_url = imageRefs[0];
       if (imageRefs[1]) metadata.last_frame_url = imageRefs[1];
     } else if (imageRefs.length) {
