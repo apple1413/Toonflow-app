@@ -15,8 +15,10 @@ export default router.post(
   async (req, res) => {
     assertAdmin(req);
     const { id } = req.body;
+    // admin 删除 vendor：清除所有同 id 行（含历史 admin/user 行 + NULL 全局行）
     await u.db("o_vendorConfig").where("id", id).del();
-    await u.db("o_agentDeploy").where("vendorId", id).update({
+    // agentDeploy 全局共享，仅清 NULL 全局行的引用
+    await u.db("o_agentDeploy").where("vendorId", id).whereNull("userId").update({
       model: null,
       vendorId: null,
     });

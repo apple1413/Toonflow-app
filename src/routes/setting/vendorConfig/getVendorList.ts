@@ -1,24 +1,20 @@
 import express from "express";
 import { success } from "@/lib/responseFormat";
 import u from "@/utils";
-import { userIdOf } from "@/utils/ownership";
-import { fallthroughList } from "@/utils/perUserSetting";
 const router = express.Router();
 
-// per-user vendor 配置：每个用户的 inputValues（API key 等）独立
-// fall-through：用户行优先 → admin 行（不存在）→ NULL 系统默认（vendor type）
+// vendor 配置全局共享：所有租户读 userId IS NULL 的全局行
 // vendor 文件系统的 code/description/inputs 由 u.vendor.getVendor 读，全局共享
 export default router.post("/", async (req, res) => {
-  const userId = userIdOf(req);
-  const data = await fallthroughList<any>("o_vendorConfig", userId, "id");
+  const data = await u.db("o_vendorConfig").whereNull("userId").select("*");
 
   const list = (
     await Promise.all(
       data.map(async (item: any) => {
         const vendor = u.vendor.getVendor(item.id!);
         if (!vendor) {
-          // vendor 文件已不存在——用户/全局两份都清掉
-          await u.db("o_vendorConfig").where("id", item.id).delete();
+          // vendor 文件已不存在——清掉对应行
+          await u.db("o_vendorConfig").where("id", item.id).whereNull("userId").delete();
           return null;
         }
         return {

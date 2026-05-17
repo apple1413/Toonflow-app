@@ -99,6 +99,8 @@ const AiTypeValues: AiType[] = [
   "productionAgent:storyboardTableAgent",
   "universalAi",
 ];
+// vendor / agent 配置全局共享：所有租户读 userId IS NULL 的全局行
+// admin 通过 setting 路由写入，普通用户只读
 async function resolveModelName(value: AiType | `${string}:${string}`): Promise<`${string}:${string}`> {
   if (AiTypeValues.includes(value as AiType)) {
     const agentUseModeVal = await u.db("o_setting").where("key", "agentUseMode").first();
@@ -173,7 +175,7 @@ async function getVendorTemplateFn(
 async function getVendorTemplateFn(fnName: Exclude<FnName, "textRequest">, modelName: `${string}:${string}`): Promise<(input: any) => any>;
 async function getVendorTemplateFn(fnName: FnName, modelName: `${string}:${string}`): Promise<any> {
   const [id, name] = modelName.split(/:(.+)/);
-  const vendorConfigData = await u.db("o_vendorConfig").where("id", id).first();
+  const vendorConfigData = await u.db("o_vendorConfig").where("id", id).whereNull("userId").first();
   if (!vendorConfigData) throw new Error(`未找到供应商配置 id=${id}`);
   const modelList = await u.vendor.getModelList(id);
   const selectedModel = modelList.find((i: any) => i.modelName == name);

@@ -86,6 +86,7 @@ export default router.post(
       await u
         .db("o_vendorConfig")
         .where("id", id)
+        .whereNull("userId")
         .update({
           models: JSON.stringify(vendor.models ?? []),
         });

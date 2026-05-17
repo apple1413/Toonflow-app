@@ -7,10 +7,8 @@ import { userIdOf } from "@/utils/ownership";
 import { upsertForUser, getAdminUserId } from "@/utils/perUserSetting";
 const router = express.Router();
 
-// 入参 id 是行 id（指向 admin 的默认行 或 当前用户已有的覆盖行）。
-// 通过 id 反查 key，再以 (userId, key) 做 upsert——
-//   - 用户已有该 key 的覆盖行：UPDATE
-//   - 没有：INSERT 新行（不会动 admin 默认）
+// agent 模型部署全局共享：仅 admin 可写，所有租户共用同一份配置
+// 入参 id 仍是行 id（用来反查 key），但写入永远落到 NULL 全局行
 export default router.post(
   "/",
   validateFields({
@@ -24,9 +22,9 @@ export default router.post(
     maxOutputTokens: z.number().optional(),
   }),
   async (req, res) => {
-    const userId = userIdOf(req);
+    await assertAdminAsync(req);
     const { id, name, model, modelName, vendorId, desc, temperature, maxOutputTokens } = req.body;
-    const row = await u.db("o_agentDeploy").where({ id }).select("key", "userId").first();
+    const row = await u.db("o_agentDeploy").where({ id }).select("key").first();
     if (!row) return res.status(404).send(error("agent 配置不存在"));
     const ownerId = Number(row.userId);
     const adminUserId = await getAdminUserId();

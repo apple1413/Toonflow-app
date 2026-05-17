@@ -7,7 +7,7 @@ const router = express.Router();
 
 export default router.post("/", async (req, res) => {
   const userId = userIdOf(req);
-  const dataList = await u.db("o_vendorConfig").select("id").where("enable", 1);
+  const dataList = await u.db("o_vendorConfig").whereNull("userId").where("enable", 1).select("id");
   if (!dataList || dataList.length === 0) {
     return res.status(404).send({ error: "模型未找到" });
   }

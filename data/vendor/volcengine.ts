@@ -398,11 +398,11 @@ const imageRequest = async (config: ImageConfig, model: ImageModel): Promise<str
       // seedream-3.0-t2i: 像素范围 [512x512, 2048x2048]
       body.size = table[ratioKey];
     } else if (totalPixels < 3686400) {
-      // 1K 像素值不满足新模型最低要求，直接传 "2K" 让模型自行决定
-      body.size = "2K";
+      // 1K 像素值不满足新模型最低要求，升级到 2K 同比例尺寸
+      body.size = sizeTable["2K"][ratioKey] || "2K";
     } else if (is5Lite && totalPixels > 10404496) {
-      // seedream-5.0-lite 最高 10404496，4K 超限，回退传 "2K"
-      body.size = "2K";
+      // seedream-5.0-lite 最高 10404496，4K 超限，回退到 2K 同比例尺寸
+      body.size = sizeTable["2K"][ratioKey] || "2K";
     } else {
       body.size = table[ratioKey];
     }

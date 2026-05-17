@@ -48,9 +48,9 @@ export default router.post(
     assertAdmin(req);
     const { id, modelName, model } = req.body;
 
-    const models = await u.db("o_vendorConfig").where("id", id).first("models");
-    if (models?.models) {
-      const existingModels = JSON.parse(models.models);
+    const row = await u.db("o_vendorConfig").where("id", id).whereNull("userId").first("models");
+    if (row?.models) {
+      const existingModels = JSON.parse(row.models);
       const modelIndex = existingModels.findIndex((m: any) => m.modelName !== modelName);
       if (modelIndex === -1) {
         existingModels.push(model);
@@ -59,6 +59,7 @@ export default router.post(
       await u
         .db("o_vendorConfig")
         .where("id", id)
+        .whereNull("userId")
         .update({
           models: JSON.stringify(existingModels),
         });

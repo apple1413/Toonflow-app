@@ -16,9 +16,9 @@ export default router.post(
     assertAdmin(req);
     const { id, modelName } = req.body;
 
-    const models = await u.db("o_vendorConfig").where("id", id).first("models");
-    if (models?.models) {
-      const existingModels = JSON.parse(models.models);
+    const row = await u.db("o_vendorConfig").where("id", id).whereNull("userId").first("models");
+    if (row?.models) {
+      const existingModels = JSON.parse(row.models);
       if (!existingModels.some((model: any) => model.modelName === modelName)) {
         return res.status(400).send(error("基本模型不允许删除"));
       }
@@ -26,6 +26,7 @@ export default router.post(
       await u
         .db("o_vendorConfig")
         .where("id", id)
+        .whereNull("userId")
         .update({
           models: JSON.stringify(updatedModels),
         });

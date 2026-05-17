@@ -101,11 +101,12 @@ export default router.post(
     }
 
     if ((vendor.id as string).includes(":")) return res.status(400).send(error("id不能包含英文冒号"));
-    const data = await u.db("o_vendorConfig").where("id", vendor.id).first();
+    const data = await u.db("o_vendorConfig").where("id", vendor.id).whereNull("userId").first();
     if (data) return res.status(500).send(error("供应商id已存在"));
-    // o_vendorConfig.id 是用户指定的字符串主键，无需取自增 id；返回值未被使用
+    // o_vendorConfig.id 是用户指定的字符串主键；vendor 配置全局共享，落 userId=NULL 全局行
     await u.db("o_vendorConfig").insert({
       id: vendor.id,
+      userId: null as any,
       inputValues: JSON.stringify(vendor.inputValues ?? {}),
       models: JSON.stringify([]),
       enable: vendor.id == "toonflow" ? 1 : 0,

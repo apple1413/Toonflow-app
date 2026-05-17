@@ -47,17 +47,16 @@ export default router.post(
     assertAdmin(req);
     const { id, model } = req.body;
 
-    const models = await u.db("o_vendorConfig").where("id", id).first("models");
-    if (models?.models) {
-      const existingModels = JSON.parse(models.models);
-      existingModels.push(model);
-      await u
-        .db("o_vendorConfig")
-        .where("id", id)
-        .update({
-          models: JSON.stringify(existingModels),
-        });
-    }
+    const row = await u.db("o_vendorConfig").where("id", id).whereNull("userId").first("models");
+    const existingModels = row?.models ? JSON.parse(row.models) : [];
+    existingModels.push(model);
+    await u
+      .db("o_vendorConfig")
+      .where("id", id)
+      .whereNull("userId")
+      .update({
+        models: JSON.stringify(existingModels),
+      });
     res.status(200).send(success("更新成功"));
   },
 );

@@ -1131,8 +1131,9 @@ export default async (knex: Knex, forceInit: boolean = false): Promise<void> => 
     { table: "o_skillList", col: "userId" }, // 老库里的技能默认归 admin
     { table: "memories", col: "userId" },
     { table: "o_imageFlow", col: "userId" }, // 老 flow 没有归属概念，默认归 admin
-    // per-user setting 表的 seed 数据归 admin，作为新用户的 fall-through 默认
-    { table: "o_agentDeploy", col: "userId" },
+    // 注意：o_agentDeploy / o_vendorConfig 不回填——这两表已收归 admin 全局共享，
+    // initData 写入时显式 userId=null，所有用户读 NULL 全局行；千万别 backfill 成 1，
+    // 否则 ai.ts 的 .whereNull("userId") 查不到任何行，AI 全部失败。
     { table: "o_prompt", col: "userId" },
     { table: "o_modelPrompt", col: "userId" },
     // 注意：o_setting 不全量回填——tokenKey / switchAiDevTool 等系统级配置应保持 userId=NULL
