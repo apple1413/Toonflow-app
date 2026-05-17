@@ -486,7 +486,7 @@ export async function getBalance(userExternalId: string): Promise<number> {
   if (!userExternalId) return -1;
   const apiToken = process.env.CREDITS_API_TOKEN;
   // 主项目可以提供同一个 base 下的 GET /balance?user_uuid=xxx，或独立 URL
-  const balanceUrl = process.env.CREDITS_BALANCE_URL ?? apiUrl.replace(/\/charge$/, "/balance");
+  const balanceUrl = process.env.CREDITS_BALANCE_URL ?? apiUrl.replace(/\/consume$/, "/balance");
   try {
     const resp = await fetch(`${balanceUrl}?user_uuid=${encodeURIComponent(userExternalId)}`, {
       method: "GET",
