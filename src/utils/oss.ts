@@ -56,11 +56,20 @@ class OSS {
     await this.ensureInit();
     const safePath = normalizeUserPath(userRelPath);
     // URL 始终使用 /，所以这里需要将系统分隔符转回 /
-    let url = `/${prefix}/`;
-    if (process.env.PUBLIC_PATH) url = process.env.PUBLIC_PATH.replace(/\/$/, "") + url;
-    if (process.env.ossURL && process.env.ossURL !== "") url = process.env.ossURL + `/${prefix}/`;
-    if (process.env.NODE_ENV == "dev") url = `http://localhost:10588/${prefix}/`;
-    if (isEletron()) url = `http://localhost:${process.env.PORT}/${prefix}/`;
+    // 优先级（互斥）：Electron 本地端口 > OSSURL 公网域名 > PUBLIC_PATH 子路径 > NODE_ENV=dev 兜底 > 同源相对路径
+    const ossUrlEnv = process.env.OSSURL || process.env.ossURL;
+    let url: string;
+    if (isEletron()) {
+      url = `http://localhost:${process.env.PORT}/${prefix}/`;
+    } else if (ossUrlEnv && ossUrlEnv !== "") {
+      url = ossUrlEnv.replace(/\/$/, "") + `/${prefix}/`;
+    } else if (process.env.PUBLIC_PATH) {
+      url = process.env.PUBLIC_PATH.replace(/\/$/, "") + `/${prefix}/`;
+    } else if (process.env.NODE_ENV == "dev") {
+      url = `http://localhost:10588/${prefix}/`;
+    } else {
+      url = `/${prefix}/`;
+    }
     return `${url}${safePath.split(path.sep).join("/")}`;
   }
 

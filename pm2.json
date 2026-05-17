@@ -7,8 +7,8 @@
   "env": {
     "NODE_ENV": "prod",
     "PORT": 10588,
-    "OSSURL": "http://127.0.0.1:10588/",
-    "//": "SaaS 部署时改为对外公开域名，如 https://toonflow.example.com/",
+    "PUBLIC_PATH": "/drama-factory",
+    "//": "PUBLIC_PATH 用于子路径部署：所有 OSS / skills / socket.io URL 都会带这个前缀，浏览器按当前域解析（同源）。如要走完全独立的公网域名再用 OSSURL=https://xxx.com/。",
     "// DATABASE_URL": "postgresql://user:pass@host:5432/db   生产 Supabase 连接串；不设走本地 SQLite",
     "// TOONFLOW_TOKEN_KEY": "<256-bit hex secret>   JWT 签名密钥；不设走 o_setting.tokenKey 这条 DB 行",
     "// SSO_SHARED_SECRET": "<external master site shared key>   外部主站签 SSO HMAC 用；不设进入降级模式（仅信前端 uid，会 warn）"
