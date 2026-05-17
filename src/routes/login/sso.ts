@@ -33,9 +33,9 @@ function verifySsoSignature(uid: string, ts: string, sig: string, secret: string
 
 // 仅允许同源相对路径，拒绝 //host、/\host、协议绝对地址等
 const sanitizeRedirect = (raw: string | undefined): string => {
-  if (!raw) return "/";
-  if (raw[0] !== "/") return "/";
-  if (raw.length > 1 && (raw[1] === "/" || raw[1] === "\\")) return "/";
+  if (!raw) return "/drama-factory/";
+  if (raw[0] !== "/") return "/drama-factory/";
+  if (raw.length > 1 && (raw[1] === "/" || raw[1] === "\\")) return "/drama-factory/";
   return raw;
 };
 

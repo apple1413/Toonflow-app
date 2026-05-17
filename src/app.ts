@@ -7,6 +7,7 @@ import http from "node:http";
 import expressWs from "express-ws";
 import logger from "morgan";
 import cors from "cors";
+import compression from "compression";
 import buildRoute from "@/core";
 import path from "path";
 import fs from "fs";
@@ -48,7 +49,8 @@ export default async function startServe(randomPort: Boolean = false) {
   await initDb(); // schema/迁移就绪后再注册路由
 
   await u.writeVersion();
-  const io = new Server(server, { cors: { origin: "*" } });
+  const socketPath = process.env.PUBLIC_PATH ? process.env.PUBLIC_PATH.replace(/\/$/, "") + "/socket.io" : "/socket.io";
+  const io = new Server(server, { cors: { origin: "*" }, path: socketPath });
   socketInit(io);
 
   if (process.env.NODE_ENV == "dev") await buildRoute();
@@ -56,6 +58,7 @@ export default async function startServe(randomPort: Boolean = false) {
   expressWs(app);
 
   app.use(logger("dev"));
+  app.use(compression());
   app.use(cors({ origin: "*" }));
   app.use(express.json({ limit: "100mb" }));
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
@@ -148,10 +151,29 @@ export default async function startServe(randomPort: Boolean = false) {
 
   // SPA fallback：所有非 /api/* 且未匹配静态文件的 GET 请求都吐 index.html，
   // 让 vue-router 接管前端路由。这样直接刷新 /login、/project/123 等都能正常工作
+  let cachedIndexHtml: string | null = null;
   app.get(/^(?!\/api\/).*/, (req, res, next) => {
     const indexPath = path.join(webDir, "index.html");
-    if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
-    next();
+    if (!fs.existsSync(indexPath)) return next();
+
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiBaseUrl) {
+      return res.sendFile(indexPath);
+    }
+
+    if (!cachedIndexHtml) {
+      let html = fs.readFileSync(indexPath, "utf8");
+      // 1. 替换前端打包时硬编码的 localhost API 地址
+      html = html.replace(/http:\/\/localhost:10588\/api/g, apiBaseUrl);
+      // 2. 注入脚本：覆盖 localStorage 里缓存的错误地址（老用户清缓存也不影响）
+      const safeUrl = apiBaseUrl.replace(/'/g, "\\'");
+      const injectScript = `<script>(function(){try{var s=JSON.parse(localStorage.getItem('setting')||'{}');if(!s.baseUrl||s.baseUrl.indexOf('localhost')!==-1){s.baseUrl='${safeUrl}';localStorage.setItem('setting',JSON.stringify(s));}}catch(e){}})();</script>`;
+      html = html.replace('<script type="module"', injectScript + '<script type="module"');
+      cachedIndexHtml = html;
+    }
+
+    res.setHeader("Content-Type", "text/html");
+    res.send(cachedIndexHtml);
   });
 
   // 404 处理
