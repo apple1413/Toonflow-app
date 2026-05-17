@@ -131,6 +131,12 @@ export default async function startServe(randomPort: Boolean = false) {
     try {
       const decoded = jwt.verify(token, tokenKey as string);
       (req as any).user = decoded;
+      // 把 userId 注入 AsyncLocalStorage，让 ai.ts / agent 深层调用能拿到做扣费
+      const userId = Number((decoded as any)?.id);
+      if (Number.isFinite(userId) && userId > 0) {
+        const { runWithUser } = await import("@/utils/requestContext");
+        return runWithUser(userId, () => next());
+      }
       next();
     } catch (err) {
       return res.status(401).send({ message: "无效的token" });

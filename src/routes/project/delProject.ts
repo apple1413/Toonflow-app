@@ -14,7 +14,13 @@ export default router.post(
   }),
   async (req, res) => {
     const { id } = req.body;
-    // 必须先确认这个项目归当前用户，否则后面整串级联删会变成对他人项目的破坏
+    // 幂等：项目行已不存在视为"已删"（前端连点或并发删除时常见），直接成功返回，
+    // 不走 assertOwnsProject 路径——它对不存在的行会抛 403，让前端弹出误导性的"删除失败"。
+    const existingRow = await u.db("o_project").where({ id }).select("userId").first();
+    if (!existingRow) {
+      return res.status(200).send(success({ message: "删除项目成功" }));
+    }
+    // 行还在的情况下，必须先确认归属，否则后面整串级联删会变成对他人项目的破坏
     await assertOwnsProject(userIdOf(req), id);
     //删除项目
     await u.db("o_project").where("id", id).delete();

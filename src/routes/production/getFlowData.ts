@@ -105,7 +105,10 @@ export default router.post(
           }),
         );
         const storyboardIds = storyboardData.map((i) => i.id);
-        const assetsIds = await u.db("o_assets2Storyboard").whereIn("storyboardId", storyboardIds).orderBy("rowid");
+        // 原 orderBy("rowid")：SQLite 隐式 ROWID 表插入顺序，PG 没有 → 切 PG 后 query throws，
+        // try 块被 catch 静默吞掉 → res.status(400)，前端 production 画布全空。
+        // 改 orderBy("id")：依赖 fixDB 给 o_assets2Storyboard 加的 BIGSERIAL id 列保留插入顺序。
+        const assetsIds = await u.db("o_assets2Storyboard").whereIn("storyboardId", storyboardIds).orderBy("id");
 
         const assets2StoryboardMap: Record<number, number[]> = {};
         assetsIds.forEach((i) => {
@@ -161,7 +164,10 @@ export default router.post(
           .sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
         res.status(200).send(success(flowData));
       } catch (err) {
-        res.status(400).send(error());
+        // 之前 catch 空抛 400 + 无 message，凡是这条路径任何 DB query 报错都被静默吞掉。
+        // 实际遇到过：SQLite→PG 迁移时 `.orderBy("rowid")` 在 PG 不存在 → 整个画布数据空白。
+        console.error("[getFlowData] 加载失败 projectId=%s episodesId=%s:", projectId, episodesId, err);
+        res.status(400).send(error((err as any)?.message ?? "加载流程数据失败"));
       }
     }
   },

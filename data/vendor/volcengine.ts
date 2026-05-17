@@ -312,6 +312,11 @@ const textRequest = (model: TextModel, think: boolean, thinkLevel: 0 | 1 | 2 | 3
           type: "enabled",
         },
         reasoning_effort: effortMap[thinkLevel],
+        // 流式调用必须 opt-in 才返回 usage（OpenAI 兼容协议默认不返回 usage 给 stream 请求）
+        // 不加这个 streamText 拿到的 result.usage 全是空的，没法对账积分消耗
+        ...(rawBody.stream
+          ? { stream_options: { ...(rawBody.stream_options || {}), include_usage: true } }
+          : {}),
       };
       return await fetch(url, {
         ...options,
@@ -428,6 +433,17 @@ const imageRequest = async (config: ImageConfig, model: ImageModel): Promise<str
 
   // 从 data 数组中提取第一张成功的图片
   if (data?.data && data.data.length > 0) {
+    // [USAGE] 实测对账：grep '\[USAGE\]' 拉这些行 → 对火山控制台账单倒推真实 ¥/张单价
+    logger(
+      `[USAGE] ${JSON.stringify({
+        vendor: "volcengine",
+        model: model.modelName,
+        kind: "image",
+        size: body.size,
+        imageCount: data.data.length,
+        ts: Date.now(),
+      })}`,
+    );
     for (const item of data.data) {
       if (item.url) {
         return await urlToBase64(item.url);
@@ -600,6 +616,21 @@ const videoRequest = async (config: VideoConfig, model: VideoModel): Promise<str
 
       switch (task.status) {
         case "succeeded":
+          // [USAGE] 实测对账：火山方舟视频按 token 计费，task.usage.total_tokens 是实际消耗
+          // grep '\[USAGE\]' 拉这些行 → 对控制台账单算出 ¥/百万token 真实单价
+          logger(
+            `[USAGE] ${JSON.stringify({
+              vendor: "volcengine",
+              model: model.modelName,
+              kind: "video",
+              duration: config.duration,
+              resolution: config.resolution,
+              audio: !!config.audio,
+              usage: task.usage ?? null,
+              taskId,
+              ts: Date.now(),
+            })}`,
+          );
           if (task.content?.video_url) {
             return { completed: true, data: task.content.video_url };
           }

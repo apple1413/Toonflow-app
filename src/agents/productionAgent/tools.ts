@@ -100,9 +100,15 @@ export default (toolCpnfig: ToolConfig) => {
           .toJSONSchema(),
       ),
       execute: async (raw) => {
-        // 容错：LLM 偶尔传 "null" 字符串或空串，统一规范为 null
+        // 容错：LLM 偶尔传 "null" 字符串、空串、0、负数当作"新增"——统一归 null。
+        // 之前漏判 0 → 直接把 id=0 塞进 INSERT，SQLite 允许导致出现 id=0 的脏数据，
+        // 后续 generate_deriveAsset 拿这个 id 调下游路由全部 403 / 永远不生图。
         const idRaw = raw.id as unknown;
-        const normalizedId = idRaw === "null" || idRaw === "" || idRaw === undefined ? null : (idRaw as number | null);
+        const idNum = typeof idRaw === "number" ? idRaw : Number(idRaw);
+        const normalizedId =
+          idRaw === "null" || idRaw === "" || idRaw == null || !Number.isFinite(idNum) || idNum <= 0
+            ? null
+            : idNum;
         const deriveAsset = { ...raw, id: normalizedId };
 
         const thinking = msg.thinking("正在操作资产...");
@@ -111,8 +117,9 @@ export default (toolCpnfig: ToolConfig) => {
         const parentAssets = await u.db("o_assets").where("id", deriveAsset.assetsId).select("id", "type").first();
         if (!parentAssets) return "关联的资产不存在";
 
-        const data = {
-          id: deriveAsset.id ?? undefined,
+        // INSERT 路径绝对不要带 id 字段（哪怕 undefined），交给 DB ROWID 自增。
+        // 早期实现把 `id: undefined` 一路传到底，再加上 0 没被归一，是 id=0 脏数据的根因。
+        const baseRow = {
           assetsId: deriveAsset.assetsId,
           projectId,
           name: deriveAsset.name,
@@ -120,19 +127,26 @@ export default (toolCpnfig: ToolConfig) => {
           describe: deriveAsset.desc,
           startTime,
         };
+
+        let finalId: number;
         if (deriveAsset.id) {
-          await u.db("o_assets").where("id", deriveAsset.id).update(data);
-          thinking.appendText(`已更新衍生资产，ID: ${deriveAsset.id}\n`);
+          await u.db("o_assets").where("id", deriveAsset.id).update(baseRow);
+          finalId = deriveAsset.id;
+          thinking.appendText(`已更新衍生资产，ID: ${finalId}\n`);
         } else {
-          const insertedId = await insertReturnId("o_assets", data);
-          data.id = insertedId;
-          await u.db("o_scriptAssets").insert({ scriptId, assetId: insertedId });
-          thinking.appendText(`已新增衍生资产，ID: ${insertedId}\n`);
+          finalId = await insertReturnId("o_assets", baseRow);
+          await u.db("o_scriptAssets").insert({ scriptId, assetId: finalId });
+          thinking.appendText(`已新增衍生资产，ID: ${finalId}\n`);
         }
-        const res = await new Promise((resolve) => socket.emit("addDeriveAsset", data, (res: any) => resolve(res)));
+
+        const data = { ...baseRow, id: finalId };
+        const res: any = await new Promise((resolve) => socket.emit("addDeriveAsset", data, (r: any) => resolve(r)));
         thinking.updateTitle("资产操作完成");
         thinking.complete();
-        return res ?? "操作成功";
+        // 把真实 id 明示返回给 LLM——之前只回 socket 的 success/message 文案，LLM 拿不到准确 id
+        // 就会用旧 id（或瞎编一个 0）去调 generate_deriveAsset
+        const baseMsg = typeof res === "string" ? res : res?.message ?? "操作成功";
+        return `${baseMsg}（衍生资产真实ID = ${finalId}，后续生成请使用此ID）`;
       },
     }),
     del_deriveAsset: tool({
@@ -168,7 +182,35 @@ export default (toolCpnfig: ToolConfig) => {
       ),
       execute: async ({ ids }) => {
         const thinking = msg.thinking("正在生成衍生资产...");
-        new Promise((resolve) => socket.emit("generateDeriveAsset", { ids }, (res: any) => resolve(res)))
+        const { projectId } = resTool.data;
+
+        // LLM 经常幻觉 id（之前观察过：聊天里说"已写入 7 条"，DB 实际只入 2 条，
+        // 但 LLM 又把 7 个 id 全传到这里）。任何一个不存在/属错项目都会让下游
+        // assertOwnsAssets 直接整批 403，前端永远看不到生成进度。
+        // 这里先和 DB 对账，只把"真实存在 + 属当前项目 + 是衍生资产（有父）"的 id 放行。
+        const rawIds = Array.isArray(ids) ? ids.filter((v) => Number.isFinite(v) && v > 0) : [];
+        let validIds: number[] = [];
+        if (rawIds.length) {
+          const rows = await u
+            .db("o_assets")
+            .whereIn("id", rawIds)
+            .andWhere("projectId", projectId)
+            .whereNotNull("assetsId")
+            .pluck("id");
+          validIds = rows.map((r: any) => Number(r));
+        }
+        const droppedIds = rawIds.filter((id) => !validIds.includes(Number(id)));
+        if (droppedIds.length) {
+          thinking.appendText(`已忽略不存在或非本项目的衍生资产ID: ${droppedIds.join(", ")}\n`);
+        }
+        if (!validIds.length) {
+          thinking.appendText("没有可生成的衍生资产，请先调用 add_deriveAsset 把衍生资产真实入库后再调用本工具。\n");
+          thinking.updateTitle("衍生资产生成跳过");
+          thinking.complete();
+          return `没有可生成的衍生资产（输入 ids=${rawIds.join(",")} 中没有任何一条在 DB 中真实存在）`;
+        }
+
+        new Promise((resolve) => socket.emit("generateDeriveAsset", { ids: validIds }, (res: any) => resolve(res)))
           .then((res) => {
             thinking.appendText(`已生成衍生资产，ID: ${JSON.stringify(res, null, 2)}\n`);
             thinking.updateTitle("衍生资产开始完成");
@@ -180,7 +222,7 @@ export default (toolCpnfig: ToolConfig) => {
             thinking.complete();
           });
 
-        return "开始生成衍生资产";
+        return `开始生成衍生资产（有效ID = ${validIds.join(",")}${droppedIds.length ? `，已忽略 ${droppedIds.join(",")}` : ""}）`;
       },
     }),
     generate_storyboard: tool({

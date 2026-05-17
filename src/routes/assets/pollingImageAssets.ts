@@ -19,7 +19,8 @@ export default router.post(
       .leftJoin("o_image", "o_assets.imageId", "o_image.id")
       .whereIn("o_assets.id", ids)
       .whereNot("o_image.state", "生成中")
-      .select("o_image.state", "o_assets.id", "o_image.filePath");
+      // errorReason 用来给前端识别失败原因（如"积分不足"），polling 期间在 toast 里聚合提示
+      .select("o_image.state", "o_assets.id", "o_image.filePath", "o_image.errorReason");
     const result = await Promise.all(
       data.map(async (item: any) => ({
         ...item,

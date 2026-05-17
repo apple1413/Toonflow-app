@@ -4,6 +4,7 @@ import * as agent from "@/agents/productionAgent/index";
 import ResTool from "@/socket/resTool";
 import { authSocketAgentContext } from "@/socket/auth";
 import { assertOwnsProject, assertOwnsScript } from "@/utils/ownership";
+import { runWithUser } from "@/utils/requestContext";
 
 export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
@@ -71,7 +72,9 @@ export default (nsp: Namespace) => {
       };
 
       try {
-        await agent.runDecisionAI(ctx);
+        // 与 scriptAgent 同理：socket 通道没走 Express JWT 中间件，需要手动注入 ALS userId，
+        // 否则 ai.ts findAgentDeploy / chargeTextCallSafe 都会拿不到当前 user，跑到 NULL 兜底
+        await runWithUser(userId, () => agent.runDecisionAI(ctx));
       } catch (err: any) {
         if (err.name !== "AbortError" && !currentController.signal.aborted) {
           console.error("[productionAgent] chat error:", u.error(err).message);

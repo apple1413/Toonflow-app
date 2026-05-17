@@ -43,6 +43,11 @@ export async function runDecisionAI(ctx: AgentContext) {
   const memory = new Memory("scriptAgent", isolationKey);
   await memory.add("user", text, { createTime: userMessageTime });
 
+  // 阶段引导用：标记本轮是否调用过 run_sub_agent_script 子代理。
+  // 用旗子比 "o_script 行数 diff" 可靠——setPlanData 走 upsert，覆盖现有剧本时 count 不变，
+  // 但只要 LLM 触发过剧本子代理，说明 agent 这轮在写剧本，就值得引导用户进入下一阶段。
+  const stageState = { scriptToolInvoked: false };
+
   const skill = path.join(u.getPath("skills"), "script_agent_decision.md");
   const prompt = await fs.promises.readFile(skill, "utf-8");
 
@@ -72,7 +77,7 @@ export async function runDecisionAI(ctx: AgentContext) {
     tools: {
       ...memory.getTools(),
       ...useTools({ resTool: ctx.resTool, msg: ctx.msg }),
-      ...createSubAgent(ctx),
+      ...createSubAgent(ctx, stageState),
     },
     onFinish: async (completion) => {
       await memory.add("assistant:decision", removeAllXmlTags(completion.text));
@@ -86,9 +91,24 @@ export async function runDecisionAI(ctx: AgentContext) {
     currentMsg = ctx.msg;
     return currentMsg;
   });
+
+  // 阶段引导：本轮 LLM 调用过 run_sub_agent_script 就推一条 "进入下一阶段：剧本管理" 按钮消息。
+  // 用 __navigate: 前缀作为前端 router.push 的信号（与普通 suggestion 的 chat 行为区分）。
+  // socket-only ephemeral 消息，不写 memory，不会进历史记录。
+  try {
+    if (stageState.scriptToolInvoked) {
+      console.log("[scriptAgent] 本轮触发剧本子代理，推送阶段引导按钮");
+      const stageMsg = resTool.newMessage("assistant", "统筹");
+      stageMsg.suggestion([{ title: "进入下一阶段：剧本管理", prompt: "__navigate:/script" }]);
+      stageMsg.complete();
+    }
+  } catch (e) {
+    // 阶段提示是非关键路径，失败不应影响主流程
+    console.warn("[scriptAgent] 阶段提示生成失败:", (e as any)?.message ?? e);
+  }
 }
 
-function createSubAgent(parentCtx: AgentContext) {
+function createSubAgent(parentCtx: AgentContext, stageState?: { scriptToolInvoked: boolean }) {
   const { resTool, abortSignal } = parentCtx;
   const memory = new Memory("scriptAgent", parentCtx.isolationKey);
 
@@ -182,6 +202,8 @@ function createSubAgent(parentCtx: AgentContext) {
     description: "运行执行subAgent来完成剧本相关任务",
     inputSchema: jsonSchema<{ prompt: string }>(promptInput),
     execute: async ({ prompt }) => {
+      // 阶段引导信号：标记本轮 LLM 触发过剧本生成子代理，用于结束时决定是否提示"进入剧本管理"
+      if (stageState) stageState.scriptToolInvoked = true;
       const skill = path.join(u.getPath("skills"), "script_execution_script.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 

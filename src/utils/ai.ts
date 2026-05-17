@@ -3,6 +3,62 @@ import { devToolsMiddleware } from "@ai-sdk/devtools";
 import axios from "axios";
 import { transform } from "sucrase";
 import u from "@/utils";
+import { getRequestUserId } from "@/utils/requestContext";
+import { fallthroughList } from "@/utils/perUserSetting";
+import { chargeForModel } from "@/utils/credits";
+
+// 按当前用户找 o_agentDeploy 行：优先用户自己的，没有再 fall through 到 admin(1)/NULL 全局默认。
+// 之前的实现是 `.where("key", value).first()`——本地 SQLite 单用户没问题，但在共享 Supabase 上
+// 这条 query 会随机返回任意用户的行，导致一个用户的自定义 agent 配置（如 my-custom-name）泄漏
+// 给所有人，并在那个 vendor 在当前 Supabase 上不存在时整条 scriptAgent 链路报错。
+async function findAgentDeploy(key: string): Promise<{ modelName?: string; [k: string]: any } | null> {
+  const userId = getRequestUserId();
+  // 没有 user 上下文（启动期/系统任务）的兜底——只看 admin/NULL 全局默认
+  if (!userId) {
+    const row = await u.db("o_agentDeploy").where({ key }).whereNull("userId").first();
+    return row ?? null;
+  }
+  const rows = await fallthroughList<any>("o_agentDeploy", userId, "key", (q) => q.where("key", key));
+  return rows[0] ?? null;
+}
+
+/**
+ * 文本调用扣费：在 invoke/stream 成功后调一次。
+ * 走 perTextCall 平均价，无需 token 实算（每月按账单校准 o_setting 平均值即可）。
+ * 失败（throw / cancel）不扣；env 没配 / 用户没 externalId 静默跳过。
+ * fire-and-forget：扣费 HTTP 失败不影响 AI 调用结果，只 warn 日志。
+ */
+async function chargeTextCallSafe(
+  vendor: string,
+  model: string,
+  aiType: string,
+  userIdOverride?: number | null,
+): Promise<void> {
+  // streamText 的 usage Promise 在 AI SDK v5 内部用 raw stream resolve，AsyncLocalStorage
+  // 上下文跨不过去 → 这里调用 .then 回调时 getRequestUserId() 返回 null，扣费会被静默跳过。
+  // 所以 stream 路径要在外层 ALS 还活着时把 userId 抓出来当参数传进来。
+  const userId = userIdOverride ?? getRequestUserId();
+  if (!userId) return; // 不是 HTTP 请求触发（如启动期任务）或未登录
+  try {
+    const userRow = await u.db("o_user").where({ id: userId }).select("externalId").first();
+    const externalId = (userRow?.externalId as string) ?? "";
+    if (!externalId) return; // 老用户没 externalId 走兼容模式
+    // 短 task_id（mixvoice trans_no 列实测上限 ~40 字符，aiType 含冒号不能直接拼）
+    // 例: tft1_qjz9c1_a3xy = 16 字符，永远不会超
+    const taskId = `tft${userId}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    await chargeForModel({
+      userExternalId: externalId,
+      vendor,
+      model,
+      kind: "text",
+      input: {},
+      taskId,
+      fallbackScene: "text_generation",
+    });
+  } catch (e: any) {
+    console.warn(`[ai.chargeTextCallSafe] 扣费失败 (vendor=${vendor} model=${model}): ${e?.message ?? e}`);
+  }
+}
 
 type AiType =
   | "scriptAgent"
@@ -50,25 +106,25 @@ async function resolveModelName(value: AiType | `${string}:${string}`): Promise<
     //正常流程
     //高级配置
     if (agentUseModeVal?.value == "1") {
-      const agentDeployData = await u.db("o_agentDeploy").where("key", value).first();
+      const agentDeployData = await findAgentDeploy(value);
       if (!agentDeployData?.modelName) throw new Error(`高级配置模式下，未找到对应的模型配置 ${value}`);
-      return agentDeployData?.modelName as `${number}:${string}`;
+      return agentDeployData.modelName as `${number}:${string}`;
     }
     //简易配置
     if (agentUseModeVal?.value == "0") {
       const [mainly] = value!.split(/:(.+)/);
-      const mainlyData = await u.db("o_agentDeploy").where("key", mainly).first();
+      const mainlyData = await findAgentDeploy(mainly);
       if (!mainlyData?.modelName) throw new Error(`简易配置模式下，未找到部署配置 ${value}`);
-      return mainlyData?.modelName as `${number}:${string}`;
+      return mainlyData.modelName as `${number}:${string}`;
     }
 
     //未查到agentUseModeVal 维持原判断
-    const agentDeployData = await u.db("o_agentDeploy").where("key", value).first();
-    let modelName = null;
+    const agentDeployData = await findAgentDeploy(value);
+    let modelName: string | null = null;
 
     if (!agentDeployData?.modelName) {
-      const [mainly] = agentDeployData!.key!.split(/:(.+)/);
-      const mainlyData = await u.db("o_agentDeploy").where("key", mainly).first();
+      const [mainly] = value!.split(/:(.+)/);
+      const mainlyData = await findAgentDeploy(mainly);
       if (!mainlyData?.modelName) throw new Error(`未找到部署配置 ${value}`);
       modelName = mainlyData.modelName;
     }
@@ -84,24 +140,24 @@ async function getModelConfig(value: AiType | `${string}:${string}`) {
     //正常流程
     //高级配置
     if (agentUseModeVal?.value == "1") {
-      const agentDeployData = await u.db("o_agentDeploy").where("key", value).first();
+      const agentDeployData = await findAgentDeploy(value);
       if (!agentDeployData?.modelName) throw new Error(`高级配置模式下，未找到对应的模型配置 ${value}`);
       return agentDeployData;
     }
     //简易配置
     if (agentUseModeVal?.value == "0") {
       const [mainly] = value!.split(/:(.+)/);
-      const mainlyData = await u.db("o_agentDeploy").where("key", mainly).first();
+      const mainlyData = await findAgentDeploy(mainly);
       if (!mainlyData?.modelName) throw new Error(`简易配置模式下，未找到部署配置 ${value}`);
       return mainlyData;
     }
 
     //未查到 agentUseModelVal 维持原流程
-    const agentDeployData = await u.db("o_agentDeploy").where("key", value).first();
+    const agentDeployData = await findAgentDeploy(value);
 
     if (!agentDeployData?.modelName) {
-      const [mainly] = agentDeployData!.key!.split(/:(.+)/);
-      const mainlyData = await u.db("o_agentDeploy").where("key", mainly).first();
+      const [mainly] = value!.split(/:(.+)/);
+      const mainlyData = await findAgentDeploy(mainly);
       if (!mainlyData?.modelName) throw new Error(`未找到部署配置 ${value}`);
       return mainlyData;
     }
@@ -196,25 +252,71 @@ class AiText {
   }
   async invoke(input: Omit<Parameters<typeof generateText>[0], "model">) {
     const config = await getModelConfig(this.AiType);
+    // 拿到本次会用的真实 (vendor, model) 拼 USAGE 日志的 key
+    const resolved = await resolveModelName(this.AiType);
+    const [vendor, model] = resolved.split(/:(.+)/);
 
-    return generateText({
+    const result = await generateText({
       ...(input.tools && { stopWhen: stepCountIs(Object.keys(input.tools).length * 50) }),
       ...input,
       model: await this.resolveModel(),
       ...(config?.temperature && { temperature: config.temperature }),
       ...(config?.maxOutputTokens && { maxOutputTokens: config.maxOutputTokens }),
     } as Parameters<typeof generateText>[0]);
+
+    // [USAGE] 文本对账：grep '\[USAGE\]' 拉这些行 → 对火山/apimart 控制台账单倒推真实单价
+    console.log(
+      `[USAGE] ${JSON.stringify({
+        vendor,
+        model,
+        kind: "text",
+        aiType: this.AiType,
+        usage: (result as any)?.usage ?? null,
+        finishReason: (result as any)?.finishReason ?? null,
+        ts: Date.now(),
+      })}`,
+    );
+    // 真扣费：按 (vendor, model) 的 perTextCall 平均价，每月按账单校准 o_setting 即可
+    void chargeTextCallSafe(vendor, model, String(this.AiType));
+    return result;
   }
   async stream(input: Omit<Parameters<typeof streamText>[0], "model">) {
     const config = await getModelConfig(this.AiType);
+    const resolved = await resolveModelName(this.AiType);
+    const [vendor, model] = resolved.split(/:(.+)/);
+    // ALS 在 streamText 的 usage Promise 跨上下文 resolve 时会丢——这里趁还在请求帧里抓住 userId
+    const requestUserId = getRequestUserId();
 
-    return streamText({
+    const result = streamText({
       ...(input.tools && { stopWhen: stepCountIs(Object.keys(input.tools).length * 50) }),
       ...input,
       model: await this.resolveModel(extractReasoningMiddleware({ tagName: "reasoning_content", separator: "\n" })),
       ...(config?.temperature && { temperature: config.temperature }),
       ...(config?.maxOutputTokens && { maxOutputTokens: config.maxOutputTokens }),
     } as Parameters<typeof streamText>[0]);
+
+    // [USAGE] 流式调用：usage 是个 Promise，stream 消费完后才 resolve
+    (result as any)?.usage
+      ?.then((usage: any) => {
+        console.log(
+          `[USAGE] ${JSON.stringify({
+            vendor,
+            model,
+            kind: "text",
+            aiType: this.AiType,
+            usage,
+            stream: true,
+            ts: Date.now(),
+          })}`,
+        );
+        // 真扣费：在 stream 完全消费完后才扣，避免没用完就扣
+        void chargeTextCallSafe(vendor, model, String(this.AiType), requestUserId);
+      })
+      .catch((e: any) => {
+        console.warn(`[USAGE] stream usage 获取失败 model=${resolved}: ${e?.message ?? e}`);
+      });
+
+    return result;
   }
 }
 

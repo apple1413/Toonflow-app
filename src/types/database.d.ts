@@ -1,4 +1,4 @@
-// @db-hash 46c86c97b2ffc399387f42c5b7c014eb
+// @db-hash 0a19a51c35b57c23aff3e6db526bb43b
 //该文件由脚本自动生成，请勿手动修改
 
 export interface memories {
@@ -24,7 +24,6 @@ export interface o_agentDeploy {
   'modelName'?: string | null;
   'name'?: string | null;
   'temperature'?: number | null;
-  'topP'?: number | null;
   'type'?: string | null;
   'userId'?: number | null;
   'vendorId'?: string | null;
@@ -97,6 +96,14 @@ export interface o_imageFlow {
   'id'?: number;
   'userId'?: number | null;
 }
+export interface o_modelEnable {
+  'createTime'?: number | null;
+  'enabled': number;
+  'id'?: number;
+  'modelName': string;
+  'updateTime'?: number | null;
+  'vendorId': string;
+}
 export interface o_modelPrompt {
   'fileName'?: string | null;
   'id'?: number;
@@ -105,6 +112,17 @@ export interface o_modelPrompt {
   'prompt'?: string | null;
   'userId'?: number | null;
   'vendorId'?: string | null;
+}
+export interface o_modelUsage {
+  'chargedCredits'?: number | null;
+  'createdAt': number;
+  'id'?: number;
+  'kind': string;
+  'model': string;
+  'taskId'?: string | null;
+  'usageJson'?: string | null;
+  'userId'?: number | null;
+  'vendor': string;
 }
 export interface o_novel {
   'chapter'?: string | null;
@@ -119,15 +137,11 @@ export interface o_novel {
   'reel'?: string | null;
 }
 export interface o_outline {
-  'data'?: string | null;
-  'episode'?: number | null;
+  'content'?: string | null;
+  'createTime'?: number | null;
   'id'?: number;
+  'name'?: string | null;
   'projectId'?: number | null;
-}
-export interface o_outlineNovel {
-  'id'?: number;
-  'novelId'?: number | null;
-  'outlineId'?: number | null;
 }
 export interface o_project {
   'artStyle'?: string | null;
@@ -218,7 +232,7 @@ export interface o_tasks {
 }
 export interface o_user {
   'createTime'?: number | null;
-  'disabled'?: boolean | null;
+  'disabled'?: number | null;
   'email'?: string | null;
   'externalId'?: string | null;
   'id'?: number;
@@ -231,6 +245,7 @@ export interface o_vendorConfig {
   'id'?: string;
   'inputValues'?: string | null;
   'models'?: string | null;
+  'userId'?: number | null;
 }
 export interface o_video {
   'errorReason'?: string | null;
@@ -267,9 +282,9 @@ export interface DB {
   "o_image": o_image;
   "o_imageFlow": o_imageFlow;
   "o_modelPrompt": o_modelPrompt;
+  "o_modelUsage": o_modelUsage;
   "o_novel": o_novel;
   "o_outline": o_outline;
-  "o_outlineNovel": o_outlineNovel;
   "o_project": o_project;
   "o_prompt": o_prompt;
   "o_script": o_script;

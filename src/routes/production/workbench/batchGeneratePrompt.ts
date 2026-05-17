@@ -36,7 +36,7 @@ export default router.post(
             .select("videoDesc", "prompt", "track", "duration", "shouldGenerateImage")
             .first();
           // 查询分镜关联的资产ID
-          const assetRows = await u.db("o_assets2Storyboard").where("storyboardId", item.id).orderBy("rowid").select("assetId");
+          const assetRows = await u.db("o_assets2Storyboard").where("storyboardId", item.id).orderBy("id").select("assetId");
           const associateAssetsIds = assetRows.map((row: any) => row.assetId);
           return {
             ...storyboard,
@@ -71,6 +71,7 @@ export default router.post(
           type: item.type,
           name: item.name,
           filePath: item.filePath,
+          imageId: (item as any).imageId,
         });
       if (item._type === "storyboard")
         storyboard.push({
@@ -81,6 +82,23 @@ export default router.post(
           associateAssetsIds: item.associateAssetsIds,
           shouldGenerateImage: item.shouldGenerateImage,
         });
+    }
+    // 把分镜关联的资产 (associateAssetsIds) 自动展开成资产列表，让 LLM 能输出 @图N 引用
+    // 多租户：限定 projectId，防止跨项目资产被引入
+    const linkedIds = Array.from(
+      new Set(storyboard.flatMap((s) => s.associateAssetsIds ?? [])),
+    ).filter((id) => Number.isFinite(id));
+    const existing = new Set(assets.map((a) => a.id));
+    const missingIds = linkedIds.filter((id) => !existing.has(id));
+    if (missingIds.length) {
+      const rows = await u
+        .db("o_assets")
+        .where({ projectId })
+        .whereIn("id", missingIds)
+        .select("id", "type", "name", "imageId");
+      for (const r of rows) {
+        assets.push({ id: r.id, type: r.type, name: r.name, imageId: r.imageId });
+      }
     }
 
     const [id, modelData] = model.split(/:(.+)/);
@@ -97,7 +115,7 @@ export default router.post(
     const content = `
           **模型名称**：${modelData},
           **资产信息**（角色、场景、道具、音频):${assets
-            .filter((i) => i.filePath)
+            .filter((i) => i.imageId || i.filePath)
             .map((i) => `[${i.id},${i.type},${i.name}]`)
             .join("，")},
           **分镜信息**：${storyboard.map(

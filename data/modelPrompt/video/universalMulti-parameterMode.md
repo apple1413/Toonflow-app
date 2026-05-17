@@ -107,29 +107,29 @@
 ...（按编号顺序列出所有资产和分镜图）
 
 [Instruction]
-Based on the storyboard @图{分镜图编号} :
-@图{角色资产编号} {动作/状态描述（英文）},
-set in the {场景描述（英文）} of @图{场景资产编号} ,
-{镜头/运镜描述（英文）},
-{情感基调（英文）},
-{台词描述（英文，含 dialogue/OS/VO 标注）/ No dialogue},
-{音效描述（英文）}.
+基于分镜图 @图{分镜图编号} ：
+@图{角色资产编号} {动作/状态描述（中文）}，
+场景设定在 @图{场景资产编号} 的{场景描述（中文）}中，
+{镜头/运镜描述（中文）}，
+{情感基调（中文）}，
+{台词描述（中文，含 对白/OS/VO 标注）/ 无台词}，
+{音效描述（中文）}。
 ```
 
 ---
 
 ## 生成规则
 
-1. **Instruction 必须用英文**
+1. **Instruction 必须用中文**（结构标签 [References]/[Instruction] 可保留为英文，但所有描述性正文必须用中文）
 2. **严格遵循 videoDesc**：提示词内容严格基于 videoDesc 的画面描述、时长、景别、运镜、角色动作、情绪、光影氛围、台词、音效字段，不编造额外信息
-3. **角色动作**从 videoDesc 的「角色动作」字段提取，翻译为简洁英文动作描述
+3. **角色动作**从 videoDesc 的「角色动作」字段提取，简洁中文动作描述
 4. **台词不可缺失**：videoDesc 中有台词的分镜，必须在 Instruction 中体现台词内容（保持原始语言，不翻译）
 5. **台词类型标注**：
-   - 普通对白 → `(dialogue)`
-   - 内心独白 → `(inner monologue, OS)`
-   - 画外音 → `(voiceover, VO)`
-6. **镜头风格**使用标准标签：`cinematic` / `wide-angle` / `close-up` / `slow motion` / `surround shooting` / `handheld`
-7. **空间关系**使用标准动词：`wearing` / `holding` / `standing on` / `following behind` / `sitting in`
+   - 普通对白 → `（对白）`
+   - 内心独白 → `（内心独白，OS）`
+   - 画外音 → `（画外音，VO）`
+6. **镜头风格**使用中文描述：`电影感` / `广角` / `特写` / `慢动作` / `环绕拍摄` / `手持`
+7. **空间关系**使用中文描述：`穿着` / `手持` / `站立于` / `跟随其后` / `坐于`
 8. 单条分镜对应单个 `@图N `，不做多帧跨镜描述
 9. 无需描述角色外观（由参考图负责）
 10. 无时长标注（由模型推断）
@@ -159,12 +159,12 @@ set in the {场景描述（英文）} of @图{场景资产编号} ,
 @图5 : [分镜图2]
 
 [Instruction]
-Based on the storyboard from @图4 to @图5 :
-@图1 standing alone atop the city wall, hands clasped behind back, robes billowing in the wind, gazing across the vast land,
-@图2 ascending the steps toward @图1 , expression worried,
-set in the ancient city wall environment of @图3 ,
-wide shot transitioning to medium tracking shot, cinematic,
-resolute determination shifting to concerned anticipation, dusk cold-toned side-backlit atmosphere fading,
-no dialogue,
-wind howling, fabric flapping, footsteps on stone.
+基于分镜图 @图4 至 @图5 ：
+@图1 独立城楼之上，负手而立，衣袂随风飘扬，目光远眺苍茫大地，
+@图2 拾级而上走向 @图1 ，神情担忧，
+场景设定在 @图3 的古城楼环境中，
+全景过渡到中景跟踪镜头，电影感，
+坚毅决绝转向忧虑关切，黄昏冷调侧逆光氛围渐暗，
+无台词，
+风声呼啸、衣袂猎猎、石阶脚步声。
 ```

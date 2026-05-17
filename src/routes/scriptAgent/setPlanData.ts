@@ -27,16 +27,20 @@ export default router.post(
       });
     const script = data.script;
 
-    await Promise.all(
-      script.map(async (s: any) => {
-        const row = await u.db("o_script").where({ projectId, name: s.name }).first();
-        if (row) {
-          await u.db("o_script").where({ id: row.id }).update({ content: s.content });
-        } else {
-          await u.db("o_script").insert({ projectId, name: s.name, content: s.content });
-        }
-      }),
-    );
+    // 之前是 check-then-insert + Promise.all 并发：前端 onXmlTag 短时间内连发 N 次
+    // setPlanData，每个请求并发都看到"行不存在"就各自 INSERT，PG 上又没唯一约束 →
+    // 同 name 出现 N 行重复（见 scripts/dedup-o-script.ts 修复脚本）。
+    //
+    // 改成 PG 的 INSERT ... ON CONFLICT (projectId, name) DO UPDATE：
+    // - 数据库层串行化同 key 的并发请求，没法插出重复
+    // - 配合 o_script (projectId, name) UNIQUE INDEX（见 initDB.ts indexPatches）
+    if (script?.length) {
+      await u
+        .db("o_script")
+        .insert(script.map((s: any) => ({ projectId, name: s.name, content: s.content })))
+        .onConflict(["projectId", "name"])
+        .merge(["content"]);
+    }
 
     res.status(200).send(success());
   },

@@ -98,7 +98,7 @@ export default router.post(
     const storyboardData = await Promise.all(
       lastStoryboard.map(async (i) => {
         return {
-          associateAssetsIds: await u.db("o_assets2Storyboard").where("storyboardId", i.id).orderBy("rowid").select("assetId").pluck("assetId"),
+          associateAssetsIds: await u.db("o_assets2Storyboard").where("storyboardId", i.id).orderBy("id").select("assetId").pluck("assetId"),
           src: i.filePath ? await u.oss.getSmallImageUrl(i.filePath) : "",
           id: i.id,
           trackId: i.trackId,

@@ -304,8 +304,19 @@ async function createSubAgent(parentCtx: AgentContext) {
       const skill = path.join(u.getPath("skills"), "production_execution_storyboard_panel.md");
       const systemPrompt = await fs.promises.readFile(skill, "utf-8");
 
+      // 关键：prompt 和 videoDesc 必须用子元素，绝对不能写成 attribute——
+      //   1. 前端 XML attribute 解析正则只识别带引号的值（utils/useChat.ts），早期模板里
+      //      `prompt=提示词内容` 没引号被整个跳过，导致 DB 里 prompt 为空、shouldGenerateImage=0
+      //      （filter 时被剔除）、batchGenerateImage 实际生 0 张图
+      //   2. prompt/videoDesc 内容可能含引号/换行/特殊字符，attribute 形式无法稳健逃逸
+      // 短字段（track/shouldGenerateImage/duration/associateAssetsIds）值固定简短，留 attribute
       const addPrompt =
-        "\n你必须使用如下XML格式写入工作区：\n```\n<storyboardItem videoDesc='视频描述' prompt=提示词内容 track='分组' shouldGenerateImage='true/false' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'></storyboardItem>\n```";
+        "\n你必须使用如下 XML 格式写入工作区（注意：prompt 和 videoDesc 必须是子元素，不是属性！）：\n```\n" +
+        "<storyboardItem track='分组' shouldGenerateImage='true' duration='视频推荐时间' associateAssetsIds='[该分镜所需的资产ID列表]'>\n" +
+        "  <videoDesc>视频描述内容</videoDesc>\n" +
+        "  <prompt>提示词内容</prompt>\n" +
+        "</storyboardItem>\n" +
+        "```";
 
       return runAgent({
         key: "productionAgent:storyboardPanelAgent",

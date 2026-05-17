@@ -7,6 +7,7 @@ import { error, success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsAssets } from "@/utils/ownership";
 import { insertReturnId } from "@/utils/insertReturnId";
+import { chargeForModel, refundCharge, estimateCostForModel, getBalance, InsufficientCreditsError } from "@/utils/credits";
 
 const router = express.Router();
 
@@ -85,6 +86,28 @@ export default router.post("/", validateFields(requestSchema), async (req, res) 
   const project = await u.db("o_project").where("id", projectId).select("artStyle", "type", "intro").first();
   if (!project) return res.status(500).send(error("项目为空"));
 
+  // 1.5 真实成本扣费：照分镜批量出图（batchGenerateImage.ts）那一套
+  //   - 预检：先按 perImage × items.length 估总价，若余额不够直接 402 阻断
+  //   - 实扣：每张图独立 task_id，AI 调用前扣、失败时按 task_id 退款（幂等）
+  const userRow = await u.db("o_user").where({ id: userId }).select("externalId").first();
+  const externalId = (userRow?.externalId as string) ?? "";
+  const [imgVendor, imgModelName] = String(model ?? "").split(/:(.+)/);
+  if (externalId && imgVendor && imgModelName && items.length > 0) {
+    const perImageCost = await estimateCostForModel(imgVendor, imgModelName, "image", {
+      size: resolution,
+      count: 1,
+    });
+    const totalEstimate = perImageCost * items.length;
+    if (totalEstimate > 0) {
+      const balance = await getBalance(externalId);
+      if (balance >= 0 && balance < totalEstimate) {
+        return res.status(402).send(
+          error(`积分不足：本次需要 ${totalEstimate}（${items.length} 张 × ${perImageCost}/张），剩余 ${balance}`),
+        );
+      }
+    }
+  }
+
   // 2. 逐条插入 o_image 占位记录，收集 imageId 列表
   const totalNovelId: number[] = [];
   for (const item of items) {
@@ -116,6 +139,40 @@ export default router.post("/", validateFields(requestSchema), async (req, res) 
       const userPrompt = buildPrompt(cfg, project.artStyle ?? "", item.name, item.prompt);
       const describe = `生成${cfg.label}图，名称：${item.name}，提示词：${item.prompt}`;
       const relatedObjects = { id: item.id, projectId, type: cfg.label };
+
+      // 每张图独立 task_id（便于失败时按 task 退款；mixvoice trans_no 列实测上限 ~40 字符）
+      const perImageTaskId = `tfag_${item.id}_${imageId}_${Date.now().toString(36)}`;
+      let charged = 0;
+      // per-image 扣费：余额已 pre-flight，理论上不会 402；真 402 直接标失败
+      if (externalId && imgVendor && imgModelName) {
+        try {
+          const r = await chargeForModel({
+            userExternalId: externalId,
+            vendor: imgVendor,
+            model: imgModelName,
+            kind: "image",
+            input: { size: resolution, count: 1 },
+            taskId: perImageTaskId,
+            fallbackScene: "image_generation",
+          });
+          charged = r.charged;
+        } catch (e: any) {
+          if (e instanceof InsufficientCreditsError) {
+            await u.db("o_image").where("id", imageId).update({
+              state: "生成失败",
+              errorReason: `积分不足：需要 ${e.required}，剩余 ${e.remaining}`,
+            });
+            return;
+          }
+          console.error(`[batchGenerateImageAssets] charge 失败 asset=${item.id}`, e);
+          await u.db("o_image").where("id", imageId).update({
+            state: "生成失败",
+            errorReason: `扣费失败: ${u.error(e).message}`,
+          });
+          return;
+        }
+      }
+
       try {
         const aiImage = u.Ai.Image(model);
         await aiImage.run(
@@ -155,6 +212,14 @@ export default router.post("/", validateFields(requestSchema), async (req, res) 
           .db("o_image")
           .where("id", imageId)
           .update({ state: "生成失败", errorReason: u.error(e).message });
+        // 生成失败按 task_id 退款（幂等）；charged===0 时跳过
+        if (charged > 0) {
+          await refundCharge({
+            userExternalId: externalId,
+            taskId: perImageTaskId,
+            reason: `image failed: ${u.error(e).message}`,
+          });
+        }
       }
     }),
   );

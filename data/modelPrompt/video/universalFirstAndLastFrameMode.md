@@ -124,19 +124,19 @@
 
 ## 生成规则
 
-1. **提示词输出全部用英文**
+1. **提示词输出全部用中文**（结构标签 [Visual]/[Motion]/[Camera]/[Audio]/[Narrative] 等可保留为英文，但所有描述性正文必须用中文）
 2. **不使用任何 `@图N ` 引用**：全部内容用纯文本描述
-3. **主体用文字描述**：在 [Visual] 中简要描述主体外观特征（如服饰、发型等关键辨识特征）
-4. **每个主体必须标注说话状态**：`speaking` / `silent` / `speaking simultaneously`
+3. **主体用文字描述**：在 [Visual] 中用中文简要描述主体外观特征（如服饰、发型等关键辨识特征）
+4. **每个主体必须标注说话状态**：`说话中` / `沉默` / `同时说话`
 5. **台词不可缺失**：videoDesc 中有台词的分镜，必须在 `[Audio]` 中完整输出台词内容（保持原始语言，不翻译）
 6. **台词类型标注**：
-   - 普通对白 → `dialogue, lip-sync active`
-   - 内心独白 → `inner monologue (OS), silent lips`
-   - 画外音 → `voiceover (VO), silent lips`
-7. **不说话的主体标注 `silent`**：防止误生口型
+   - 普通对白 → `对白，口型同步`
+   - 内心独白 → `内心独白（OS），口型紧闭`
+   - 画外音 → `画外音（VO），口型紧闭`
+7. **不说话的主体标注 `沉默`**：防止误生口型
 8. **Motion 时间轴**：每段最低 1 秒，不超过总时长
 9. **全程单一连贯镜头**：Camera 段落描述从头到尾一个镜头，绝不切镜
-10. **镜头类型**从以下选取：`Wide establishing shot / Over-the-shoulder / Medium shot / Close-up / Wide shot / POV / Dutch angle / Crane up / Dolly right / Whip pan / Handheld / Slow motion`
+10. **镜头类型**从以下选取（中文描述）：`远景定场镜头 / 过肩镜头 / 中景 / 特写 / 全景 / 主观视角POV / 倾斜镜头 / 升镜 / 右移镜头 / 甩镜 / 手持 / 慢动作`
 
 ---
 
@@ -155,23 +155,23 @@
 
 ```
 [Visual]
-Shen Ci: male, dark flowing robes, hair tied up, standing alone atop city wall, hands clasped behind back, robes billowing, silent.
-Su Jin: female, light-colored dress, hair partially down, ascending steps toward Shen Ci, expression worried, silent.
-Ancient city wall, vast open land beyond, dusk sky fading.
-Cinematic, photorealistic, 4K, high contrast, desaturated tones, shallow depth of field.
+沈辞：男性，黑色飘逸长袍，发髻束起，独立城楼之上，负手而立，衣袂随风飘扬，沉默。
+苏锦：女性，浅色衣裙，半披散发，拾级而上走向沈辞，神情担忧，沉默。
+古城楼，远方苍茫大地辽阔无际，黄昏天色渐暗。
+电影感、写实质感、4K 高清、高对比、冷调低饱和、浅景深。
 
 [Motion]
-0s-4s: Shen Ci stands still on city wall edge, robes flutter in wind, hair sways gently. Gaze fixed on distant horizon.
-4s-8s: Su Jin climbs the last few steps onto the wall, walks toward Shen Ci. Shen Ci remains still, unaware. Su Jin slows as she approaches.
+0s-4s：沈辞静立城楼边缘，衣袂随风飘动，发丝轻摆，目光凝视远方天际。
+4s-8s：苏锦拾级而上，迈上城楼最后几级台阶，缓步走向沈辞。沈辞依旧静立，未察觉。苏锦临近时放慢脚步。
 
 [Camera]
-Wide establishing shot, static for first 4 seconds capturing the lone figure. Then smooth transition to medium tracking shot following the woman ascending steps, single continuous take throughout, no cuts.
+远景定场镜头，前 4 秒静止捕捉独立身影；随后平滑过渡到中景跟踪，跟随苏锦拾级而上，全程单一连贯镜头，绝不切镜。
 
 [Audio]
-0s-4s: Wind howling across wall, fabric flapping rhythmically. No dialogue.
-4s-8s: Footsteps on stone, robes rustling. No dialogue.
-Shen Ci — silent. Su Jin — silent.
+0s-4s：呼啸的风声掠过城墙，衣袂随风猎猎作响。无台词。
+4s-8s：石阶上的脚步声，衣袍摩挲声。无台词。
+沈辞 — 沉默。苏锦 — 沉默。
 
 [Narrative]
-Lone figure on city wall, then arrival of a companion. Tension between determination and concern. Single continuous take.
+独立城楼的孤影，伴侣的到来。坚毅与忧虑之间的张力。全程单一连贯长镜头。
 ```

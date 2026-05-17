@@ -90,9 +90,9 @@
 
 - **单图首帧模式**：仅有首帧（分镜图），无尾帧；每次仅输入/输出一条分镜
 - **单条分镜输入/输出**：每次仅输入一条 `<storyboardItem>` 及其关联资产信息，输出也仅为一段完整的叙事式提示词
-- **叙事式英文提示词**：像写小说一样描写画面，禁止标签罗列（不写 `4K, cinematic, high quality` 这类堆砌）
+- **叙事式中文提示词**：像写小说一样描写画面，禁止标签罗列（不写 `4K, 电影感, 高品质` 这类堆砌）
 - **三段式结构**：风格基调 → 主体动作 + 场景环境 + 光线氛围 → 镜头收尾
-- **纯文本提示词**：提示词内**不使用任何 `@图N ` 引用**，全部内容用纯文本描述  
+- **纯文本提示词**：提示词内**不使用任何 `@图N ` 引用**，全部内容用纯文本描述
 - **严格遵循 videoDesc**：提示词内容严格基于 videoDesc 中的画面描述、时长、景别、运镜、角色动作、情绪、光影氛围、台词、音效字段生成，不编造额外内容
 
 ---
@@ -117,27 +117,27 @@
 
 | 原则 | 说明 | 示例 |
 |------|------|------|
-| 风格基调放最前 | 一句话定性整体气质 | `A cinematic epic scene` |
-| 主体+动作紧密绑定 | 主体后面直接跟动作，外观细节嵌入主体描述 | `A young man in dark flowing robes stands alone atop the city wall` |
-| 情绪用动作暗示 | 不直接陈述情绪 | ❌ `He is sad.` → ✅ `head drops slowly, shoulders slumped` |
-| 环境融入叙事 | 不罗列环境属性 | ✅ `hazy blue sky stretches over the emerald valley` |
-| 光线单独成句 | 光线方向+色温+质感+情绪 | `Warm golden hour light streams from behind, casting long shadows across the stone floor` |
-| 镜头语言收尾 | 一句话点睛 | `Captured in a wide establishing shot from a low-angle perspective, static camera` |
-| 禁止标签堆砌 | 不写 `4K, cinematic, high quality` | `cinematic` 融入风格基调即可 |
+| 风格基调放最前 | 一句话定性整体气质 | `一幕极具电影感的史诗场景` |
+| 主体+动作紧密绑定 | 主体后面直接跟动作，外观细节嵌入主体描述 | `一名身着黑色飘逸长袍的年轻男子独立于古城楼之上` |
+| 情绪用动作暗示 | 不直接陈述情绪 | ❌ `他很悲伤` → ✅ `头缓缓低垂，肩膀微微下沉` |
+| 环境融入叙事 | 不罗列环境属性 | ✅ `朦胧的蓝色天空笼罩着翠绿的山谷` |
+| 光线单独成句 | 光线方向+色温+质感+情绪 | `温暖的黄昏余晖从身后倾泻而下，在石板地面拉出长长的影子` |
+| 镜头语言收尾 | 一句话点睛 | `以广角定场镜头从低角度捕捉，静止机位` |
+| 禁止标签堆砌 | 不写 `4K, 电影感, 高品质` | `电影感` 融入风格基调即可 |
 
 ---
 
 ## 生成规则
 
-1. **全部用英文**
+1. **全部用中文**
 2. **不使用任何 `@图N ` 引用**
 3. **叙事式描写**：禁止标签罗列和配置清单式写法
 4. **主体用文字描述**：简要描述主体外观特征，嵌入主体描述中
 5. **台词不可缺失**：videoDesc 中有台词的分镜，必须在提示词中完整输出台词内容（保持原始语言，不翻译）
 6. **台词类型标注**：
-   - 普通对白 → `(dialogue)`
-   - 内心独白 → `(inner monologue, OS)`
-   - 画外音 → `(voiceover, VO)`
+   - 普通对白 → `（对白）`
+   - 内心独白 → `（内心独白，OS）`
+   - 画外音 → `（画外音，VO）`
 7. **单条输入/输出**：每次仅处理一条分镜，无编号前缀
 8. **无需标注时长**：时长由模型侧控制
 9. **镜头描述融入叙事**：不用方括号标签，用完整句子描述镜头
@@ -159,13 +159,13 @@
 输出：
 
 ```
-A cinematic epic scene with a cold, desaturated palette,
-A lone man in dark flowing robes stands atop an ancient city wall, hands clasped behind his back, robes and hair billowing in the wind, gaze fixed on the vast land stretching to the horizon, jaw set firm, eyes unwavering.
-The weathered stone battlements frame the endless expanse below, rolling terrain fading into haze beneath a heavy dusk sky, clouds layered in muted golds and slate greys.
-Cold side-backlight from the setting sun carves a sharp silhouette, long shadows stretching across the stone floor, a faint warm rim outlining the figure against the cool atmosphere.
-No dialogue.
-Wind howling across the open wall, fabric flapping rhythmically.
-Captured in a wide establishing shot from a slightly low angle, static camera, single continuous take.
+一幕极具电影感的史诗场景，冷调低饱和色板，
+一名身着黑色飘逸长袍的男子独立于古城楼之上，负手而立，衣袂与发丝随风飘扬，目光凝视着延伸至天际的辽阔大地，下颌坚定，眼神不动如磐。
+斑驳的石砌城垛勾勒出脚下广袤的天地，连绵起伏的地形在沉重的黄昏天空下渐隐成霭，云层层叠出黯淡的金色与铅灰色调。
+夕阳冷调的侧逆光勾出锋利的剪影，长长的阴影在石板地面上延伸，淡淡的暖色边光在冷调氛围中微微勾勒出人物轮廓。
+无台词。
+风声呼啸掠过空旷的城墙，衣袍随风猎猎作响。
+以广角定场镜头从略低角度捕捉，静止机位，全程单一连贯长镜头。
 ```
 
 **示例2：有台词分镜**
@@ -181,11 +181,11 @@ Captured in a wide establishing shot from a slightly low angle, static camera, s
 输出：
 
 ```
-A melancholic cinematic scene, dusk tones deepening,
-A young woman in a light-colored dress ascends the final stone steps onto the city wall, her gaze locked on the lone figure ahead, brow slightly furrowed, pace slowing as she approaches, lips parting softly.
-The ancient city wall stretches behind her, weathered stairs leading up from below, the distant skyline dimming as the last traces of golden hour fade into twilight.
-Fading warm light mingles with rising cool blue tones, the contrast between the two figures softened by the diffused remnants of sunset.
-"你又一个人在这里。" — Su Jin (dialogue).
-Footsteps on stone, wind sweeping across the battlements, fabric rustling.
-A medium tracking shot follows the woman from behind as she ascends and approaches, handheld camera with subtle movement, single continuous take.
+一幕忧郁的电影感场景，黄昏色调日渐深沉，
+一名身着浅色衣裙的年轻女子缓步登上城楼最后几级石阶，目光锁定前方独立的身影，眉头微蹙，越走越近，脚步渐缓，唇齿轻启。
+古城楼在她身后延伸，斑驳的石阶自下方蜿蜒而上，远方天际线渐暗，最后一抹黄昏余晖渐隐于暮色之中。
+渐弱的暖光与渐起的冷蓝色调相互交融，两人之间的对比被夕阳残留的柔和余韵所柔化。
+"你又一个人在这里。" — 苏锦（对白）。
+石阶上的脚步声，风掠过城垛，衣袍摩挲作响。
+中景跟踪镜头从女子身后跟随她拾级而上、逐渐靠近，手持机位带微弱晃动，全程单一连贯长镜头。
 ```

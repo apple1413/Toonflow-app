@@ -3,6 +3,8 @@ import u from "@/utils";
 import { z } from "zod";
 import { success } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
+import { userIdOf } from "@/utils/ownership";
+import { fallthroughList } from "@/utils/perUserSetting";
 const router = express.Router();
 
 export default router.post(
@@ -12,7 +14,11 @@ export default router.post(
   }),
   async (req, res) => {
     const { type } = req.body;
-    const dataList = await u.db("o_vendorConfig").select("id").where("enable", 1);
+    // per-user fall-through：每个 vendor.id 只保留一行（用户行优先 → admin 行 → NULL 全局默认），
+    // 避免普通用户既有自己的覆盖行又有 NULL 默认行时模型列表重复
+    const userId = userIdOf(req);
+    const allVendors = await fallthroughList<any>("o_vendorConfig", userId, "id");
+    const dataList = allVendors.filter((v) => Number(v.enable) === 1);
     if (!dataList || dataList.length === 0) {
       return res.status(404).send({ error: "模型未找到" });
     }
@@ -25,12 +31,13 @@ export default router.post(
           type === "all"
             ? models.filter((item: { type: string }) => item.type !== "video")
             : models.filter((item: { type: string }) => item.type === type);
-        return filtered.map((item: { name: string; modelName: string; type: string }) => ({
+        return filtered.map((item: { name: string; modelName: string; type: string; tier?: string }) => ({
           id: data.id,
           label: item.name,
           value: item.modelName,
           type: item.type,
           name: vendorData.name,
+          tier: item.tier, // premium 高消耗模型前端会标红警示
         }));
       }),
     );

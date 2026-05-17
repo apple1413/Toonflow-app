@@ -6,7 +6,7 @@ import { success, error } from "@/lib/responseFormat";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf, assertOwnsProject, assertOwnsScript, assertOwnsVideoTrack } from "@/utils/ownership";
 import { insertReturnId } from "@/utils/insertReturnId";
-import { chargeCredits, InsufficientCreditsError } from "@/utils/credits";
+import { chargeForModel, refundCharge, InsufficientCreditsError } from "@/utils/credits";
 const router = express.Router();
 
 type Type = "imageReference" | "startImage" | "endImage" | "videoReference" | "audioReference";
@@ -46,14 +46,22 @@ export default router.post(
     await assertOwnsScript(userId, scriptId);
     await assertOwnsVideoTrack(userId, trackId);
 
-    // 扣积分（场景：video_generation）。env 未配置 / admin form-login 用户跳过；余额不足 402
+    // 按 (vendor, model, config) 真实成本扣费。env 未配置 / admin form-login 用户跳过；
+    // 余额不足 402；新模型没价目时 fallback 到 scene='video_generation' 保底
     const userRow = await u.db("o_user").where({ id: userId }).select("externalId").first();
-    const taskId = `toonflow:video:${trackId}:${Date.now()}`;
+    const userExternalId = (userRow?.externalId as string) ?? "";
+    // 短 task_id（mixvoice trans_no 列实测上限 ~40 字符）
+    const taskId = `tfv_${trackId}_${Date.now().toString(36)}`;
+    const [chargeVendor, chargeModelName] = String(model).split(/:(.+)/);
     try {
-      await chargeCredits({
-        userExternalId: (userRow?.externalId as string) ?? "",
-        scene: "video_generation",
+      await chargeForModel({
+        userExternalId,
+        vendor: chargeVendor,
+        model: chargeModelName,
+        kind: "video",
+        input: { duration, resolution, audio: !!audio },
         taskId,
+        fallbackScene: "video_generation",
       });
     } catch (e: any) {
       if (e instanceof InsufficientCreditsError) {
@@ -144,6 +152,12 @@ export default router.post(
             state: "生成失败",
             errorReason: u.error(error).message,
           });
+        // 生成失败自动退款（按 taskId 幂等，重复调不会重复退）
+        await refundCharge({
+          userExternalId,
+          taskId,
+          reason: `video failed: ${u.error(error).message}`,
+        });
       }
     })();
   },

@@ -4,7 +4,7 @@ import u from "@/utils";
 import { z } from "zod";
 import { validateFields } from "@/middleware/middleware";
 import { userIdOf } from "@/utils/ownership";
-import { upsertForUser } from "@/utils/perUserSetting";
+import { upsertForUser, getAdminUserId } from "@/utils/perUserSetting";
 const router = express.Router();
 
 // 入参 id 是行 id（指向 admin 的默认行 或 当前用户已有的覆盖行）。
@@ -29,8 +29,10 @@ export default router.post(
     const row = await u.db("o_agentDeploy").where({ id }).select("key", "userId").first();
     if (!row) return res.status(404).send(error("agent 配置不存在"));
     const ownerId = Number(row.userId);
-    // 仅允许覆盖当前用户自己的行 或 admin 默认；不允许越权改别的用户的行
-    if (ownerId !== userId && ownerId !== 1) return res.status(403).send(error("无权修改该 agent 配置"));
+    const adminUserId = await getAdminUserId();
+    // 仅允许覆盖当前用户自己的行 或 admin 默认；不允许越权改别的用户的行。
+    // 注意：admin id 在 Supabase 上是动态的（不再硬编码 1），所以走 getAdminUserId()。
+    if (ownerId !== userId && ownerId !== adminUserId) return res.status(403).send(error("无权修改该 agent 配置"));
     await upsertForUser("o_agentDeploy", userId, { key: row.key }, {
       name, model, modelName, vendorId, desc, temperature, maxOutputTokens,
     });

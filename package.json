@@ -48,7 +48,6 @@
     "axios": "^1.13.2",
     "axios-retry": "^4.5.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.9.0",
     "compressing": "^2.1.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -69,7 +68,6 @@
     "serialize-error": "^13.0.1",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
-    "sqlite3": "^6.0.1",
     "sucrase": "^3.35.1",
     "uuid": "^13.0.0",
     "vercel-minimax-ai-provider": "^0.0.2",
@@ -96,10 +94,5 @@
     "nodemon": "^3.1.11",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
-  },
-  "overrides": {
-    "@rmp135/sql-ts": {
-      "better-sqlite3": "^12.8.0"
-    }
   }
 }

@@ -1,3 +1,6 @@
+// 自动加载项目根目录 .env（dev / pm2 / docker 都通过 cwd 找；Electron 打包后无 .env 文件时静默 no-op）
+import "dotenv/config";
+
 // 判断是否为打包后的 Electron 环境
 const isElectron = typeof process.versions?.electron !== "undefined";
 let isPackaged = false;

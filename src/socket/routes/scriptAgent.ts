@@ -3,6 +3,7 @@ import { Namespace, Socket } from "socket.io";
 import * as agent from "@/agents/scriptAgent/index";
 import ResTool from "@/socket/resTool";
 import { authSocketAgentContext } from "@/socket/auth";
+import { runWithUser } from "@/utils/requestContext";
 
 export default (nsp: Namespace) => {
   nsp.on("connection", async (socket: Socket) => {
@@ -48,7 +49,11 @@ export default (nsp: Namespace) => {
       };
 
       try {
-        await agent.runDecisionAI(ctx);
+        // socket 通道走的是 socket.io，不经过 Express JWT 中间件的 AsyncLocalStorage 注入，
+        // 所以 agent 深层调用 getRequestUserId() 会拿到 null，导致 per-user 配置 fall-through
+        // 全部走 NULL 全局默认分支，找不到当前用户保存的 o_agentDeploy 行。
+        // 这里手动用 runWithUser 把 socket 的 userId 注入 ALS，与 HTTP 路径行为对齐。
+        await runWithUser(userId, () => agent.runDecisionAI(ctx));
       } catch (err: any) {
         if (err.name !== "AbortError" && !currentController.signal.aborted) {
           console.error("[scriptAgent] chat error:", u.error(err).message);
